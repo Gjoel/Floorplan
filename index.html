@@ -224,6 +224,10 @@
 #bar3d .lbl3d input, #bar3d .lbl3d select{border:1px solid var(--ui-border); border-radius:6px; padding:3px 5px; font-size:12px; background:#fff; color:var(--ink);}
 #bar3d{display:flex; gap:8px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--ui-border); background:#fff; flex-wrap:wrap;}
 #bar3d .hint3d{font-size:12px; color:var(--muted); margin-left:auto;}
+#bar3d select{border:1px solid var(--ui-border); border-radius:6px; padding:4px 6px; font-size:12px; background:#fff; color:var(--ink);}
+#btn3dHelp{width:28px; padding:4px 0; font-weight:600;}
+#help3d{position:absolute; left:14px; top:14px; width:300px; background:#ffffff; border:1px solid var(--ui-border); border-radius:10px; padding:12px 14px; font-size:12px; line-height:1.5; color:var(--ink); box-shadow:0 6px 24px rgba(0,0,0,0.12); z-index:2;}
+#help3d b{font-weight:600;}
 #stage3d{flex:1; position:relative; min-height:0;}
 #svg3d{width:100%; height:100%; touch-action:none; cursor:grab; display:block;}
 #svg3d.dragging{cursor:grabbing;}
@@ -520,9 +524,11 @@
           <option value="grow">Grow plan (rooms keep size)</option>
           <option value="shrink">Keep plan (rooms shrink)</option>
         </select>
-        <button id="btnInsertWalls" title="Insert walls using the mode chosen alongside. In grow mode you can re-click after changing the thickness to re-space existing walls, and drag rooms back flush wherever you want an open-plan zone.">Insert walls</button>
+        <button id="btnInsertWalls" title="Insert walls using the mode chosen alongside. Once walls are in, changing a thickness above re-spaces them on the spot (open-plan joins you dragged flush stay open); re-clicking this walls every flush join again. Drag rooms back flush wherever you want an open-plan zone.">Insert walls</button>
+        <button id="btnRemoveWalls" title="Take the walls back out: rooms return flush against each other and out to the original outline, ready to re-insert at a different thickness or mode.">Remove walls</button>
         <button id="btnWallLock" title="Freeze rooms and cuts so a finished walled plan cannot be nudged out of alignment. Openings and fixtures stay editable.">Lock rooms</button>
       </div>
+      <div id="wallNote" style="font-size:11px; color:var(--muted); margin-top:5px; line-height:1.4;"></div>
 
       <div class="row" style="margin-top:8px;">
         <label>North arrow</label>
@@ -602,6 +608,12 @@
       </div>
       <div class="row" id="rfOverRow"><label for="rfOver" title="Eaves overhang past the outside walls">Overhang (mm)</label>
         <input type="number" id="rfOver" step="50" min="0" max="1500" style="width:90px"></div>
+      <div class="row" id="rfFitRow"><label for="rfFit" title="One rectangle over the whole building, or a roof that steps in and out with the rooms (an L-shaped house gets an L-shaped roof)">Roof plan</label>
+        <select id="rfFit" style="flex:1;">
+          <option value="box">One rectangle over everything</option>
+          <option value="follow">Follow the room outline</option>
+        </select>
+      </div>
       <div class="row" id="rfColorRow"><label for="rfColor" title="Roofing colour in the 3D view">Roof colour</label>
         <input type="color" id="rfColor" style="width:60px; height:24px; padding:1px; border:1px solid var(--ui-border); border-radius:5px; background:#fff;"></div>
       <label class="ckrow" id="rfShowRow"><input type="checkbox" id="rfShow" title="Dashed roof outline, ridge or fall arrow and pitch on the plan"> Show roof outline on plan</label>
@@ -1063,20 +1075,49 @@
 <div id="view3d">
   <div id="bar3d">
     <button id="btn3dClose">← Back to plan</button>
-    <button id="btn3dReset">Reset view</button>
+    <select id="sel3dView" title="Jump to a set viewpoint. Drag to look around from there.">
+      <option value="">View…</option>
+      <optgroup label="Corners">
+        <option value="nw">Front-left corner</option>
+        <option value="ne">Front-right corner</option>
+        <option value="se">Rear-right corner</option>
+        <option value="sw">Rear-left corner</option>
+      </optgroup>
+      <optgroup label="Sides (low)">
+        <option value="n">Front</option>
+        <option value="e">Right side</option>
+        <option value="s">Rear</option>
+        <option value="w">Left side</option>
+      </optgroup>
+      <optgroup label="Plan">
+        <option value="top">From above</option>
+        <option value="iso">Default (rear-left, raised)</option>
+      </optgroup>
+    </select>
+    <button id="btn3dReset" title="Back to the default viewpoint and zoom (double-click the picture does the same)">Reset view</button>
+    <button id="btn3dRoof" class="toggled" title="Show or hide the roof in this view only — the design keeps its roof. Hide it to look down into the rooms and click floors.">Show roof</button>
     <button id="btn3dLabels" class="toggled">Labels</button>
     <button id="btn3dFix" class="toggled">Furniture</button>
-    <button id="btn3dXray" title="See-through walls to peek inside">X-ray walls</button>
+    <button id="btn3dXray" title="See-through walls and roof to peek inside">X-ray</button>
     <label class="lbl3d">Wall height <input type="number" id="in3dWall" step="50" min="2200" max="3600" style="width:72px"> mm</label>
     <label class="lbl3d" title="Raise the whole building on a subfloor. Add Entry steps from the fixture palette to climb back down to the ground.">Floor height <input type="number" id="in3dFloor" step="50" min="0" max="1500" style="width:64px"> mm</label>
     <label class="lbl3d" title="Roof type — pitch, fall direction and overhang live in the Heights &amp; roof panel beside the plan">Roof <select id="sel3dRoof"><option value="none">None</option><option value="flat">Flat</option><option value="skillion">Skillion</option><option value="gable">Gable</option></select></label>
     <label class="lbl3d" title="Time of day. The sun tracks east through north to west (following the plan's north arrow), and light, shadows and sky follow.">Time <input type="range" id="in3dTime" min="6" max="19" step="0.25" value="10" style="width:110px"> <span id="in3dTimeLbl" style="min-width:58px; display:inline-block;">10:00 am</span></label>
-    <button id="btn3dPng">Download PNG</button>
-    <button id="btn3dObj" title="Wavefront OBJ model, opens in Windows 3D Viewer or Blender">Download OBJ</button>
-    <span class="hint3d">Click a window, door, floor or any fixture to edit it · drag to spin · Shift+drag tilts · right-drag pans · wheel zooms · double-click resets · Esc deselects, then closes</span>
+    <button id="btn3dPng" title="Download this view as a PNG picture">Save PNG</button>
+    <button id="btn3dObj" title="Download a Wavefront OBJ model, opens in Windows 3D Viewer or Blender">Save OBJ</button>
+    <span class="hint3d">Double-click a wall to add a window or door · click to edit · drag to look around</span>
+    <button id="btn3dHelp" title="All the controls">?</button>
   </div>
   <div id="stage3d">
     <svg id="svg3d" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="help3d" style="display:none;">
+      <div style="font-weight:600; margin-bottom:6px;">Getting around</div>
+      <div><b>Drag</b> spins · <b>Shift+drag</b> tilts · <b>right-drag</b> or <b>Ctrl+drag</b> pans · <b>wheel</b> zooms at the pointer · <b>arrow keys</b> nudge the view · <b>+ / −</b> zoom · <b>double-click empty ground</b> resets · the <b>View…</b> list jumps to corners, sides and plan view</div>
+      <div style="font-weight:600; margin:8px 0 6px;">Editing</div>
+      <div><b>Double-click a wall</b> adds a window (outside wall) or door (inside wall) right where you clicked, then opens it for editing · <b>click</b> a window, door, floor, wall or fixture to select it · drag the round handles on a selected window to resize it, drag the glass to slide it · drag a fixture to move it · <b>Delete</b> removes the selection · <b>Esc</b> deselects, then closes</div>
+      <div style="font-weight:600; margin:8px 0 6px;">Looking inside</div>
+      <div><b>Show roof</b> hides the roof in this view only · <b>X-ray</b> makes walls and roof see-through · <b>Furniture</b> and <b>Labels</b> toggle what is drawn · the <b>Time</b> slider moves the sun</div>
+    </div>
     <div id="panel3d" style="display:none;">
       <div id="p3Head3"><span id="p3Title">—</span><button id="p3Close" title="Deselect (Esc)">×</button></div>
       <div id="p3Open">
@@ -1097,6 +1138,10 @@
       <div id="p3Room">
         <div class="p3row"><label title="This room's floor height relative to the whole building's Floor height. Negative steps down.">Floor level (mm)</label><input type="number" id="p3Lvl" step="50" min="-1500" max="1500"></div>
         <div id="p3Base" class="p3note"></div>
+        <div class="p3btns">
+          <button id="p3AddWin" title="Put a window in the middle of this room's longest outside wall (double-click any wall to place one exactly)">+ Window</button>
+          <button id="p3AddDoor" title="Put a door in the middle of this room's longest wall shared with another room (double-click any wall to place one exactly)">+ Door</button>
+        </div>
       </div>
       <div id="p3Fix">
         <div class="p3row"><label>Width (mm)</label><input type="number" id="p3FW" step="50" min="150"></div>
@@ -1736,125 +1781,214 @@ function roomWalled(rm){ return rm.cat === "int" || rm.cat === "hall" || rm.cat 
    lands inside the original outline. Host cuts widen half a wall wherever
    a nested room faces the cut wall, and openings stay pinned to the edge
    they sit on. */
-function insertWallsShrink(){
-  const t = wallGapVal(), ew = extWallVal(), tol = 25;
-  const lim = Math.max(t*2 + 40, t + 60);
+function isShrinkMode(){ return (state.wallMode || "grow") === "shrink"; }
+/* the mode the walls that are in now were inserted with — re-spacing and
+   removal follow it even if the selector has been changed since */
+function wallsInShrink(){
+  if(state.wallsIn && (state.wallsInMode === "shrink" || state.wallsInMode === "grow")) return state.wallsInMode === "shrink";
+  return isShrinkMode();
+}
+/* ---- Re-spacing walls that are already in ----------------------------
+   Changing a thickness after the walls were in used to need an undo back
+   to the flush plan, which a freshly loaded file cannot do, so the numbers
+   looked stuck. Now the plan re-spaces itself on the spot.
+   Keep-plan mode: every internal joint moves half the change on each side
+   and every outside face moves the whole change, so the outer footprint
+   stays put. Joints the user dragged flush (open plan) stay flush unless
+   `flushToo` is set, which is what the Insert walls button does.
+   Remove walls runs the same maths back to zero. */
+function respaceShrink(oldT, oldE, newT, newE, flushToo){
+  const tol = 25, big = Math.max(oldT, newT);
+  const lim = Math.max(big*2 + 40, big + 60);
   const rooms = state.rooms;
-  if(!rooms.length || (!t && !ew)) return;
-  if(state.wallsIn){
-    readout.textContent = "walls are already in — undo first to insert them again";
-    return;
-  }
-  pushUndo();
+  const walled = rooms.filter(roomWalled);
+  if(!walled.length) return false;
   const nets = rooms.map(rm => [rm, roomNetCuts(rm)]);
   const emptyBetween = (px, py) => !nets.some(([r2, cuts]) => netContains(r2, cuts, px, py));
-  const walled = rooms.filter(roomWalled);
+  /* what a joint does, from the gap it sits at now:
+       flush (open plan)         stays, or walls up when flushToo
+       one old wall thick        becomes the new thickness
+       nothing within reach      an outside face, moves with the band
+       anything else             the user's own spacing, left alone */
+  const jointShift = g => {
+    if(g === null) return newE - oldE;
+    if(Math.abs(g) <= 5) return flushToo ? newT/2 : 0;
+    if(Math.abs(g - oldT) <= 12) return (newT - oldT)/2;
+    return 0;
+  };
+  /* gap classification for one face of a room: the face's own boundary
+     segments (net of cuts) are matched against facing edges of the other
+     walled rooms. Flush beats a wall on a mixed face, so an open-plan join
+     the user made never grows a sliver of wall. */
+  const faceGap = (rm, segs, edgePos, vertical, dir) => {
+    if(!segs.length) return null;
+    let flush = null, wall = null, any = false;
+    for(const T of walled){
+      if(T === rm) continue;
+      for(const eg of roomBoundaryEdges(T)){
+        const isV = eg.x1 === eg.x2;
+        if(isV !== vertical) continue;
+        const pos = vertical ? eg.x1 : eg.y1;
+        const g0 = (pos - edgePos) * dir;
+        if(g0 < -tol || g0 > lim) continue;
+        const a1 = vertical ? Math.min(eg.y1, eg.y2) : Math.min(eg.x1, eg.x2);
+        const a2 = vertical ? Math.max(eg.y1, eg.y2) : Math.max(eg.x1, eg.x2);
+        const seg = segs.find(sg => Math.min(a2, sg[1]) - Math.max(a1, sg[0]) > tol);
+        if(!seg) continue;
+        if(g0 > 5){
+          const mid = (Math.max(a1, seg[0]) + Math.min(a2, seg[1])) / 2;
+          const px = vertical ? edgePos + dir*g0/2 : mid;
+          const py = vertical ? mid : edgePos + dir*g0/2;
+          if(!emptyBetween(px, py)) continue;
+        }
+        any = true;
+        if(Math.abs(g0) <= 5) flush = 0;
+        else if(Math.abs(g0 - oldT) <= 12 && wall === null) wall = g0;
+      }
+    }
+    if(flush !== null) return 0;
+    if(wall !== null) return wall;
+    return any ? NaN : null;          // NaN: something odd sits there, leave it
+  };
+  const segsOf = (rm, k) => {
+    const out = [];
+    for(const e of roomBoundaryEdges(rm)){
+      const v = e.x1 === e.x2;
+      if(k === "l" && v && e.x1 === rm.x) out.push([Math.min(e.y1,e.y2), Math.max(e.y1,e.y2)]);
+      if(k === "r" && v && e.x1 === rm.x + rm.w) out.push([Math.min(e.y1,e.y2), Math.max(e.y1,e.y2)]);
+      if(k === "t" && !v && e.y1 === rm.y) out.push([Math.min(e.x1,e.x2), Math.max(e.x1,e.x2)]);
+      if(k === "b" && !v && e.y1 === rm.y + rm.h) out.push([Math.min(e.x1,e.x2), Math.max(e.x1,e.x2)]);
+    }
+    return out;
+  };
+  const shiftOf = g => Number.isNaN(g) ? 0 : jointShift(g);
   const plans = new Map();
   for(const rm of walled){
-    const face = (edgePos, o1, o2, vertical, dir) => {
-      let bestGap = null, bestWalled = false;
-      for(const [T] of nets){
-        if(T === rm) continue;
-        for(const eg of roomBoundaryEdges(T)){
-          const isV = eg.x1 === eg.x2;
-          if(isV !== vertical) continue;
-          const pos = vertical ? eg.x1 : eg.y1;
-          const g0 = (pos - edgePos) * dir;
-          if(g0 < -tol || g0 > lim) continue;
-          const a1 = vertical ? Math.min(eg.y1, eg.y2) : Math.min(eg.x1, eg.x2);
-          const a2 = vertical ? Math.max(eg.y1, eg.y2) : Math.max(eg.x1, eg.x2);
-          if(Math.min(a2, o2) - Math.max(a1, o1) <= tol) continue;
-          if(g0 > 5){
-            const mid = (Math.max(a1, o1) + Math.min(a2, o2)) / 2;
-            const px = vertical ? edgePos + dir*g0/2 : mid;
-            const py = vertical ? mid : edgePos + dir*g0/2;
-            if(!emptyBetween(px, py)) continue;
-          }
-          if(bestGap === null || g0 < bestGap){ bestGap = g0; bestWalled = roomWalled(T); }
-        }
-      }
-      if(bestGap === null) return ew;
-      return bestWalled ? t/2 : ew;
-    };
     plans.set(rm.id, {
-      l:face(rm.x, rm.y, rm.y + rm.h, true, -1),
-      r:face(rm.x + rm.w, rm.y, rm.y + rm.h, true, +1),
-      t:face(rm.y, rm.x, rm.x + rm.w, false, -1),
-      b:face(rm.y + rm.h, rm.x, rm.x + rm.w, false, +1)
+      l:shiftOf(faceGap(rm, segsOf(rm, "l"), rm.x, true, -1)),
+      r:shiftOf(faceGap(rm, segsOf(rm, "r"), rm.x + rm.w, true, +1)),
+      t:shiftOf(faceGap(rm, segsOf(rm, "t"), rm.y, false, -1)),
+      b:shiftOf(faceGap(rm, segsOf(rm, "b"), rm.y + rm.h, false, +1))
     });
   }
+  /* host cuts widen wherever a nested room faces the cut wall, by the same
+     joint rule (a cut wall never counts as an outside face) */
   const cutGrow = [];
   for(const rm of walled){
     for(const c of (rm.cuts || [])){
-      const g = {l:0, r:0, t:0, b:0};
+      const near = {l:null, r:null, t:null, b:null};
+      const take = (k, gap) => {
+        if(gap < -tol || gap > lim) return;
+        if(near[k] === null || Math.abs(gap) <= 5 || (Math.abs(near[k]) > 5 && gap < near[k])) near[k] = gap;
+      };
       for(const N of walled){
         if(N === rm) continue;
         const oy = N.y < c.y + c.h && N.y + N.h > c.y;
         const ox = N.x < c.x + c.w && N.x + N.w > c.x;
-        if(oy && Math.abs(N.x - c.x) <= tol) g.l = t/2;
-        if(oy && Math.abs((N.x + N.w) - (c.x + c.w)) <= tol) g.r = t/2;
-        if(ox && Math.abs(N.y - c.y) <= tol) g.t = t/2;
-        if(ox && Math.abs((N.y + N.h) - (c.y + c.h)) <= tol) g.b = t/2;
+        if(oy){ take("l", N.x - c.x); take("r", (c.x + c.w) - (N.x + N.w)); }
+        if(ox){ take("t", N.y - c.y); take("b", (c.y + c.h) - (N.y + N.h)); }
       }
-      if(g.l || g.r || g.t || g.b) cutGrow.push([c, g]);
+      const cs = gap => gap === null ? 0 : jointShift(gap);
+      const g = {l:cs(near.l), r:cs(near.r), t:cs(near.t), b:cs(near.b)};
+      if(g.l || g.r || g.t || g.b) cutGrow.push([rm, c, g]);
     }
   }
-  const pins = [];
+  let moved = false;
+  const snaps = new Map();
+  for(const rm of walled) snaps.set(rm.id, roomResizeSnapshot(rm));
   for(const rm of walled){
     const sd = plans.get(rm.id);
-    for(const o of (rm.open || [])){
-      if(o.orient === "v"){
-        if(Math.abs(o.x - rm.x) <= tol) pins.push([o, "x", sd.l]);
-        else if(Math.abs(o.x - (rm.x + rm.w)) <= tol) pins.push([o, "x", -sd.r]);
-      } else {
-        if(Math.abs(o.y - rm.y) <= tol) pins.push([o, "y", sd.t]);
-        else if(Math.abs(o.y - (rm.y + rm.h)) <= tol) pins.push([o, "y", -sd.b]);
-      }
-    }
-  }
-  for(const rm of walled){
-    const sd = plans.get(rm.id);
+    if(!sd.l && !sd.r && !sd.t && !sd.b) continue;
+    moved = true;
     rm.x += sd.l; rm.w = Math.max(300, rm.w - sd.l - sd.r);
     rm.y += sd.t; rm.h = Math.max(300, rm.h - sd.t - sd.b);
   }
-  for(const [c, g] of cutGrow){
+  for(const [rm, c, g] of cutGrow){
+    moved = true;
+    /* openings on the cut walls ride with them */
+    for(const o of (rm.open || [])){
+      if(o.orient === "v"){
+        if(Math.abs(o.x - c.x) <= tol && o.y < c.y + c.h && o.y + o.len > c.y) o.x -= g.l;
+        else if(Math.abs(o.x - (c.x + c.w)) <= tol && o.y < c.y + c.h && o.y + o.len > c.y) o.x += g.r;
+      } else {
+        if(Math.abs(o.y - c.y) <= tol && o.x < c.x + c.w && o.x + o.len > c.x) o.y -= g.t;
+        else if(Math.abs(o.y - (c.y + c.h)) <= tol && o.x < c.x + c.w && o.x + o.len > c.x) o.y += g.b;
+      }
+    }
     c.x -= g.l; c.w += g.l + g.r;
     c.y -= g.t; c.h += g.t + g.b;
   }
-  for(const [o, ax, d] of pins){ o[ax] += d; }
-  state.wallsIn = true;
+  /* openings on the outer walls and furniture flush against them follow */
+  for(const rm of walled) applyRoomFollowers(rm, snaps.get(rm.id));
+  selSub = null;
+  return moved;
+}
+function insertWallsShrink(){
+  const t = wallGapVal(), ew = extWallVal();
+  if(!state.rooms.length || (!t && !ew)) return;
+  pushUndo();
+  if(state.wallsIn){
+    /* walls are in already: wall every flush join and re-space the rest */
+    respaceShrink(t, ew, t, ew, true);
+    syncPlotInputs();
+    wallNote(`Walls re-inserted at ${t} / ${ew} mm — every flush join is walled again. Drag rooms back flush for open plan, or change a thickness above to re-space.`);
+  } else {
+    /* from a flush plan: every touching pair gives up half a wall each,
+       outside faces the full external thickness, so the outline stays put */
+    respaceShrink(0, 0, t, ew, true);
+    state.wallsIn = true;
+    state.wallsInMode = "shrink";
+    syncPlotInputs();
+    wallNote(`Walls inserted at ${t} mm internal / ${ew} mm external — Keep plan: the outline stayed put and the rooms gave the walls their space. Drag rooms back flush wherever you want open plan.`);
+  }
   selSub = null;
   renderAll();
 }
 function insertWalls(){
-  if((state.wallMode || "grow") === "shrink"){ insertWallsShrink(); return; }
+  if(wallsInShrink()){ insertWallsShrink(); return; }
   const t = wallGapVal();
   if(!t || !state.rooms.length) return;
   pushUndo();
+  respaceGrow(t, t, true);
+  wallNote(state.wallsIn ? `Walls at ${t} mm — Grow plan: every joint re-spaced and flush joins walled again. Drag rooms back flush wherever you want open plan.` : "");
+}
+/* Grow-plan spacing: rooms slide apart (or back together) along each axis
+   so every joint reads exactly `t`. `prevT` is the thickness the joints
+   were at before, so a big reduction still finds the old wide joints.
+   With `flushToo` off, joints sitting flush stay flush (open plan). t = 0
+   closes every joint up: that is Remove walls in this mode. */
+function respaceGrow(t, prevT, flushToo){
+  if(!state.rooms.length) return;
   const tol = 6;
-  const lim = Math.max(t*2 + 40, t + 60);
+  const big = Math.max(t, prevT || 0);
+  const lim = Math.max(big*2 + 40, big + 60);
   const rooms = state.rooms;
   const axisShifts = (lo, size, oLo, oSize) => {
     /* lo/size read the sorted axis, oLo/oSize the cross axis */
     const order = [...rooms].sort((a,b)=>lo(a)-lo(b));
     const sh = new Map(), rode = new Set();
     for(const R of order){
-      let s = 0;
+      /* a room with nothing to its left stays put; otherwise it takes the
+         largest shift its left-hand joints ask for — negative when the
+         joints are closing up, which the old zero floor never allowed */
+      let s = -Infinity, found = false;
       for(const L of order){
         if(L === R) break;
         const ov = Math.min(oLo(L)+oSize(L), oLo(R)+oSize(R)) - Math.max(oLo(L), oLo(R));
         if(ov <= tol) continue;
         const g = lo(R) - (lo(L) + size(L));
+        found = true;
         if(g < -tol){
           /* R starts inside L (e.g. a hall nested in a cut): ride along */
           s = Math.max(s, sh.get(L.id) || 0);
           rode.add(R.id);
           continue;
         }
-        const grow = (g < lim) ? (t - g) : 0;
+        const flush = Math.abs(g) <= tol;
+        const grow = (g < lim) ? ((flush && !flushToo) ? 0 : (t - g)) : 0;
         s = Math.max(s, (sh.get(L.id) || 0) + grow);
       }
-      sh.set(R.id, s);
+      sh.set(R.id, found ? s : 0);
     }
     sh.rode = rode;
     return sh;
@@ -1898,6 +2032,7 @@ function insertWalls(){
         }
       }
       if(!best) continue;
+      if(!flushToo && Math.abs(best.g0) <= tol) continue;   /* open-plan end stays open */
       const g = best.g0 + best.shT - (sh.get(R.id) || 0) - t;
       if(Math.abs(g) > tol) grow.set(R.id, g);
     }
@@ -1941,9 +2076,10 @@ function insertWalls(){
     it.x += itemDx.get(it.id) || 0;
     it.y += itemDy.get(it.id) || 0;
   }
-  state.wallsIn = true;
+  state.wallsIn = t > 0;
+  if(t > 0) state.wallsInMode = "grow"; else delete state.wallsInMode;
   /* grow a rectangular plot if the spread pushed rooms past it */
-  if(!sitePolyActive()){
+  if(t > 0 && !sitePolyActive()){
     const e = extWallVal();
     let mx = 0, my = 0;
     for(const rm of rooms){
@@ -1955,6 +2091,31 @@ function insertWalls(){
     if(my > state.plot.d) state.plot.d = Math.ceil(my/100)*100;
   }
   syncPlotInputs();
+  renderAll();
+}
+/* thickness edited while the walls are in: re-space in whichever mode the
+   plan was walled in (caller has already pushed undo and set the state) */
+function rethickWalls(oldT, oldE, newT, newE){
+  const shrink = wallsInShrink();
+  if(state.wallsIn && !state.wallsInMode) state.wallsInMode = shrink ? "shrink" : "grow";
+  if(shrink) return respaceShrink(oldT, oldE, newT, newE, false);
+  if(newT !== oldT) respaceGrow(newT, oldT, false);
+  return newT !== oldT;
+}
+function removeWalls(){
+  if(!state.wallsIn){
+    wallNote("No walls are in — the rooms already sit flush. Set the thicknesses and press Insert walls.");
+    return;
+  }
+  pushUndo();
+  const t = wallGapVal(), e = extWallVal();
+  if(wallsInShrink()) respaceShrink(t, e, 0, 0, false);
+  else respaceGrow(0, t, true);
+  state.wallsIn = false;
+  delete state.wallsInMode;
+  if(state.wallLock){ state.wallLock = false; }
+  syncPlotInputs();
+  wallNote("Walls taken out — rooms are back flush and out to the outline. Set the thicknesses, then Insert walls puts them in again (Ctrl+Z undoes).");
   renderAll();
 }
 function roomEdgeVals(excludeId){
@@ -3843,7 +4004,12 @@ function roofOverlaySvg(forExport){
   const w1 = forExport ? `stroke-width="30"` : `stroke-width="1.6px" vector-effect="non-scaling-stroke"`;
   const w2 = forExport ? `stroke-width="36"` : `stroke-width="1.8px" vector-effect="non-scaling-stroke"`;
   let s = `<g pointer-events="none">`;
-  s += `<rect x="${bb.x1}" y="${bb.y1}" width="${bb.x2-bb.x1}" height="${bb.y2-bb.y1}" fill="none" stroke="${col}" stroke-opacity="0.75" ${w1} stroke-dasharray="10 6"/>`;
+  const rc = roofFollows() ? roofCells() : null;
+  if(rc){
+    for(const e of rc.edges) s += `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="${col}" stroke-opacity="0.75" ${w1} stroke-dasharray="10 6"/>`;
+  } else {
+    s += `<rect x="${bb.x1}" y="${bb.y1}" width="${bb.x2-bb.x1}" height="${bb.y2-bb.y1}" fill="none" stroke="${col}" stroke-opacity="0.75" ${w1} stroke-dasharray="10 6"/>`;
+  }
   const cxm = (bb.x1+bb.x2)/2, cym = (bb.y1+bb.y2)/2;
   const tag = (x, y, txt, rot) => `<text x="${x}" y="${y}" font-size="300" text-anchor="middle" fill="${col}"
       stroke="#ffffff" stroke-width="80" paint-order="stroke" stroke-linejoin="round" font-family="Arial, Helvetica, sans-serif"${rot ? ` transform="rotate(${rot} ${x} ${y})"` : ""}>${txt}</text>`;
@@ -6251,6 +6417,9 @@ document.addEventListener("keydown", e => {
       close3D(); return;
     }
     if(typing3) return;
+    /* undo and redo work in here too; the picture follows the plan */
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === "z"){ e.preventDefault(); doUndo(); return; }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === "y"){ e.preventDefault(); doRedo(); return; }
     if(e.key === "Delete" || e.key === "Backspace"){
       const q = sel3Open();
       if(q){ e.preventDefault(); pushUndo(); q.rm.open = (q.rm.open||[]).filter(x=>x.id!==q.o.id); view3.sel = null; selSub = null; commit3(); return; }
@@ -6263,7 +6432,7 @@ document.addEventListener("keydown", e => {
     if(e.key === "ArrowRight"){ view3.theta += step; render3D(); e.preventDefault(); }
     if(e.key === "ArrowUp"){ view3.phi = Math.min(1.5, view3.phi + 0.05); render3D(); e.preventDefault(); }
     if(e.key === "ArrowDown"){ view3.phi = Math.max(0.22, view3.phi - 0.05); render3D(); e.preventDefault(); }
-    if(e.key === "+" || e.key === "="){ view3.zoom = Math.min(6, view3.zoom*1.12); render3D(); }
+    if(e.key === "+" || e.key === "="){ view3.zoom = Math.min(8, view3.zoom*1.12); render3D(); }
     if(e.key === "-"){ view3.zoom = Math.max(0.4, view3.zoom/1.12); render3D(); }
     return;
   }
@@ -7682,6 +7851,8 @@ function syncPlotInputs(){
   $("btnWallLock").classList.toggle("primary", !!state.wallLock);
   $("wallGap").value = Number.isFinite(+state.wallGap) ? Math.max(0, Math.round(+state.wallGap)) : 90;
   $("extWall").value = Number.isFinite(+state.extWall) ? Math.max(0, Math.round(+state.extWall)) : 190;
+  $("btnRemoveWalls").disabled = !state.wallsIn;
+  wallNote();
   if(!state.north) state.north = {show:false, deg:0, pos:null};
   $("northDeg").value = Number.isFinite(+state.north.deg) ? state.north.deg : 0;
   $("btnNorth").classList.toggle("toggled", !!state.north.show);
@@ -7821,23 +7992,61 @@ $("btnAlignEdge").addEventListener("click", ()=>{
   renderAll();
   renderSiteEdges();
 });
+/* The wall status line under the Walls row. The canvas readout is
+   overwritten by every mouse move, so anything worth reading lives here. */
+function wallNote(msg){
+  const el = $("wallNote");
+  if(!el) return;
+  const t = wallGapVal(), e = extWallVal();
+  const status = state.wallsIn
+    ? `Walls are in at ${t} mm internal / ${e} mm external (${wallsInShrink() ? "Keep plan" : "Grow plan"}). Change a figure above and the plan re-spaces itself; Insert walls again walls up any flush joins.`
+    : `No walls in yet — rooms sit flush. Internal ${t} mm / external ${e} mm will be used by Insert walls.`;
+  el.innerHTML = msg ? `<b style="color:var(--ink); font-weight:600;">${esc(msg)}</b><br>${esc(status)}` : esc(status);
+  if(msg) readout.textContent = msg;
+}
+/* Wall thickness inputs. Once the walls are in, a new figure re-spaces the
+   plan straight away (undoable), so the number never looks stuck again. */
 $("wallGap").addEventListener("change", ()=>{
   let v = Math.round(parseFloat($("wallGap").value));
-  if(isNaN(v) || v < 0) v = 0;
-  if(state.wallsIn && v < 50) v = 50;   /* walls are in: no vanishing them */
-  state.wallGap = v;
+  if(!Number.isFinite(v) || v < 0) v = 0;
+  const old = wallGapVal();
+  let note = "";
+  if(state.wallsIn && v < 50){
+    v = 50;
+    note = " · 50 mm is the thinnest while walls are in — Remove walls first to go thinner or turn them off";
+  }
   $("wallGap").value = v;
+  if(v === old){ if(note) wallNote(`Internal wall stays ${v} mm` + note); return; }
+  pushUndo();
+  state.wallGap = v;
+  if(state.wallsIn){
+    rethickWalls(old, extWallVal(), v, extWallVal());
+    wallNote((wallsInShrink()
+      ? `Internal walls re-spaced ${old} → ${v} mm · Keep plan: each joint ${v > old ? "took" : "gave back"} ${Math.abs(v - old)} mm between the rooms either side, flush joins stayed open`
+      : `Internal walls re-spaced ${old} → ${v} mm · Grow plan: the building ${v > old ? "spread" : "closed up"} to suit, flush joins stayed open`) + note + " · Ctrl+Z undoes");
+  } else {
+    wallNote(`Internal wall ${v} mm — rooms now snap ${v} mm apart while dragging. Press Insert walls when the plan is laid out.`);
+  }
+  renderAll();
 });
 $("extWall").addEventListener("change", ()=>{
   let v = Math.round(parseFloat($("extWall").value));
   if(!Number.isFinite(v) || v < 0) v = 0;
-  if(state.wallsIn && v < 50) v = 50;   /* walls are in: no vanishing them */
+  const old = extWallVal();
   $("extWall").value = v;
+  if(v === old) return;
   pushUndo();
   state.extWall = v;
+  if(state.wallsIn && wallsInShrink()){
+    rethickWalls(wallGapVal(), old, wallGapVal(), v);
+    wallNote(`External wall ${old} → ${v} mm · Keep plan: outside faces ${v > old ? "pulled in" : "pushed out"} ${Math.abs(v - old)} mm so the outer footprint stays where it was · Ctrl+Z undoes`);
+  } else {
+    wallNote(`External wall ${v} mm — the band is drawn outside the rooms; overall sizes and setbacks read to its outer face.`);
+  }
   renderAll();
 });
 $("btnInsertWalls").addEventListener("click", insertWalls);
+$("btnRemoveWalls").addEventListener("click", removeWalls);
 $("northDeg").addEventListener("change", ()=>{
   if(!state.north) state.north = {show:false, deg:0, pos:null};
   let v = Math.round(parseFloat($("northDeg").value));
@@ -7935,6 +8144,7 @@ $("fileInput").addEventListener("change", e => {
         round:[1,5,10,50].includes(+d.round) ? +d.round : 1,
         wallMode:d.wallMode === "shrink" ? "shrink" : "grow",
         wallsIn:!!d.wallsIn,
+        wallsInMode:(d.wallsIn && (d.wallsInMode === "shrink" || d.wallsInMode === "grow")) ? d.wallsInMode : undefined,
         wallLock:!!d.wallLock,
         schedClear:!!d.schedClear,
         lotSbDef:Number.isFinite(+d.lotSbDef) ? Math.max(0, Math.round(+d.lotSbDef)) : undefined,
@@ -9710,6 +9920,7 @@ function normRoof(q, legacy){
     dir:(q && ["N","S","E","W"].includes(q.dir)) ? q.dir : "S",
     ridge:(q && ["auto","x","y"].includes(q.ridge)) ? q.ridge : "auto",
     over:Math.round(num(q && q.over, 0, 1500, 450)),
+    fit:(q && q.fit === "follow") ? "follow" : "box",
     show2d:q ? q.show2d !== false : true,
     color:(q && /^#[0-9a-fA-F]{6}$/.test(q.color)) ? q.color : "#b2aea2"
   };
@@ -9735,18 +9946,117 @@ function roofState(){
   }
   return state.roof;
 }
+/* outside-face rectangles of the roofed core: every enclosed room grown by
+   the external wall thickness, so the roof and its overhang measure from
+   the outer face of the wall, as they do on the plan */
+function coreRects(){
+  const e = extWallVal();
+  const core = state.rooms.filter(rm => rm.cat === "int" || rm.cat === "hall" || rm.cat === "gar");
+  return core.map(r => {
+    const q = roomQuadW(r);
+    return {x1:Math.min(...q.map(p=>p.x)) - e, y1:Math.min(...q.map(p=>p.y)) - e,
+            x2:Math.max(...q.map(p=>p.x)) + e, y2:Math.max(...q.map(p=>p.y)) + e, rm:r};
+  });
+}
+/* union of axis-aligned rectangles as grid cells plus the outline edges
+   (merged runs, each with its outward normal) */
+function rectUnion(rects, extraXs, extraYs){
+  const xs = [...new Set([...rects.flatMap(r=>[r.x1, r.x2]), ...(extraXs||[])])].sort((a,b)=>a-b);
+  const ys = [...new Set([...rects.flatMap(r=>[r.y1, r.y2]), ...(extraYs||[])])].sort((a,b)=>a-b);
+  const nx = xs.length - 1, ny = ys.length - 1;
+  const filled = [];
+  for(let j = 0; j < ny; j++){
+    filled.push([]);
+    for(let i = 0; i < nx; i++){
+      const cx = (xs[i]+xs[i+1])/2, cy = (ys[j]+ys[j+1])/2;
+      filled[j][i] = rects.some(r => cx > r.x1 && cx < r.x2 && cy > r.y1 && cy < r.y2);
+    }
+  }
+  const F = (i,j) => i >= 0 && i < nx && j >= 0 && j < ny && filled[j][i];
+  const cells = [], raw = [];
+  for(let j = 0; j < ny; j++) for(let i = 0; i < nx; i++){
+    if(!filled[j][i]) continue;
+    const x1 = xs[i], x2 = xs[i+1], y1 = ys[j], y2 = ys[j+1];
+    if(!F(i,j-1)) raw.push({x1, y1, x2, y2:y1, nx:0, ny:-1});
+    if(!F(i+1,j)) raw.push({x1:x2, y1, x2, y2, nx:1, ny:0});
+    if(!F(i,j+1)) raw.push({x1:x2, y1:y2, x2:x1, y2, nx:0, ny:1});
+    if(!F(i-1,j)) raw.push({x1, y1:y2, x2:x1, y2:y1, nx:-1, ny:0});
+  }
+  /* greedy merge of the filled grid into larger rectangles: runs along each
+     row first, then equal runs stacked in the rows below */
+  const used = filled.map(r => r.map(() => false));
+  for(let j = 0; j < ny; j++) for(let i = 0; i < nx; i++){
+    if(!filled[j][i] || used[j][i]) continue;
+    let i2 = i;
+    while(i2 + 1 < nx && filled[j][i2+1] && !used[j][i2+1]) i2++;
+    let j2 = j;
+    while(j2 + 1 < ny){
+      let ok = true;
+      for(let q = i; q <= i2; q++) if(!filled[j2+1][q] || used[j2+1][q]){ ok = false; break; }
+      if(!ok) break;
+      j2++;
+    }
+    for(let q = j; q <= j2; q++) for(let r = i; r <= i2; r++) used[q][r] = true;
+    cells.push({x:xs[i], y:ys[j], w:xs[i2+1]-xs[i], h:ys[j2+1]-ys[j]});
+  }
+  /* merge collinear runs that touch end to end */
+  const edges = [];
+  const key = e => (e.nx ? "v" : "h") + ":" + (e.nx ? e.x1 : e.y1) + ":" + e.nx + ":" + e.ny;
+  const groups = new Map();
+  for(const e of raw){ const k = key(e); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
+  for(const list of groups.values()){
+    const v = !!list[0].nx;
+    const lo = e => v ? Math.min(e.y1, e.y2) : Math.min(e.x1, e.x2);
+    list.sort((a,b) => lo(a) - lo(b));
+    let cur = null;
+    for(const e of list){
+      const a = lo(e), b = v ? Math.max(e.y1, e.y2) : Math.max(e.x1, e.x2);
+      if(cur && Math.abs(a - cur.b) < 1){ cur.b = b; continue; }
+      if(cur) edges.push(cur);
+      cur = {a, b, e};
+    }
+    if(cur) edges.push(cur);
+  }
+  return {cells, edges:edges.map(({a, b, e}) => {
+    /* keep the winding of the first raw edge so the outline stays consistent */
+    const fwd = (e.nx ? e.y2 > e.y1 : e.x2 > e.x1);
+    const p = fwd ? [a, b] : [b, a];
+    return e.nx ? {x1:e.x1, y1:p[0], x2:e.x1, y2:p[1], nx:e.nx, ny:e.ny}
+                : {x1:p[0], y1:e.y1, x2:p[1], y2:e.y1, nx:e.nx, ny:e.ny};
+  })};
+}
 /* footprint the roof covers: enclosed rooms plus overhang */
 function roofBBox(){
   const R = roofState();
-  const core = state.rooms.filter(rm => rm.cat === "int" || rm.cat === "hall" || rm.cat === "gar");
-  if(!core.length) return null;
-  const cpts = core.flatMap(r => [[r.x,r.y],[r.x+r.w,r.y],[r.x+r.w,r.y+r.h],[r.x,r.y+r.h]].map(pt => roomRotXY(r, pt[0], pt[1])));
+  const rects = coreRects();
+  if(!rects.length) return null;
+  const core = rects.map(q => q.rm);
   return {
-    x1:Math.min(...cpts.map(p=>p.x)) - R.over, y1:Math.min(...cpts.map(p=>p.y)) - R.over,
-    x2:Math.max(...cpts.map(p=>p.x)) + R.over, y2:Math.max(...cpts.map(p=>p.y)) + R.over,
-    z0:Math.max(...core.map(roomBase)) + wallH3(),
+    x1:Math.min(...rects.map(r=>r.x1)) - R.over, y1:Math.min(...rects.map(r=>r.y1)) - R.over,
+    x2:Math.max(...rects.map(r=>r.x2)) + R.over, y2:Math.max(...rects.map(r=>r.y2)) + R.over,
+    /* the roof underside sits a little above the wall tops, on its battens
+       and rafters; the wall infill fills that band all round */
+    z0:Math.max(...core.map(roomBase)) + wallH3() + ROOF_LIFT,
     zlo:Math.min(...core.map(roomBase)) + wallH3(), core
   };
+}
+const ROOF_LIFT = 150;
+/* the roof plan when it follows the rooms: the core outline grown by the
+   overhang, as cells for the slab and merged edges for the fascia */
+function roofCells(extraXs, extraYs){
+  const R = roofState();
+  const rects = coreRects().map(r => ({x1:r.x1 - R.over, y1:r.y1 - R.over, x2:r.x2 + R.over, y2:r.y2 + R.over}));
+  if(!rects.length) return null;
+  return rectUnion(rects, extraXs, extraYs);
+}
+function roofFollows(){ return roofState().fit === "follow"; }
+/* is a plan point under the roof */
+function underRoof(x, y){
+  const bb = roofBBox();
+  if(!bb || x < bb.x1 || x > bb.x2 || y < bb.y1 || y > bb.y2) return false;
+  if(!roofFollows()) return true;
+  const rc = roofCells();
+  return !!rc && rc.cells.some(c => x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h);
 }
 /* height of the roof underside above z0 at a point, for skillion planes */
 function skillionH(R, bb, x, y){
@@ -9766,6 +10076,7 @@ function roofZAt(x, y){
   if(R.type === "none") return null;
   const bb = roofBBox();
   if(!bb || x < bb.x1 || x > bb.x2 || y < bb.y1 || y > bb.y2) return null;
+  if(!underRoof(x, y)) return null;
   if(R.type === "flat") return bb.z0;
   if(R.type === "skillion") return bb.z0 + skillionH(R, bb, x, y);
   const alongX = R.ridge === "x" ? true : (R.ridge === "y" ? false : (bb.x2 - bb.x1 >= bb.y2 - bb.y1));
@@ -9990,16 +10301,21 @@ function roomBoundaryEdges(rm){
 function wallPieces(roomsArg){
   const srcRooms = roomsArg || state.rooms;
   const WH = wallH3(), HH = headH3();
+  const EW = extWallVal(), IW = wallGapVal();
   /* parking spots get no wall, kerb or beam at all — they are flat concrete */
   const rank = cat => (cat === "park" ? -1 : (cat === "out" ? 0 : (cat === "cov" ? 1 : 2)));
-  /* net footprints for telling outside walls from internal ones */
-  const nets = [];
+  /* net footprints: every roofed room for the wall/beam/kerb decision, the
+     walled rooms alone for telling an outside face from an inside one */
+  const nets = [], netsW = [];
   for(const rm of srcRooms){
     if(roomTilt(rm) || rm.cat === "park") continue;
-    nets.push({rm, cuts:(rm.cuts||[]).map(c=>clampCutRect(rm,c)).filter(Boolean)});
+    const q = {rm, cuts:(rm.cuts||[]).map(c=>clampCutRect(rm,c)).filter(Boolean)};
+    nets.push(q);
+    if(roomWalled(rm)) netsW.push(q);
   }
-  const occAt = (px, py) => nets.some(q => px > q.rm.x && px < q.rm.x + q.rm.w &&
+  const occIn = (list, px, py) => list.some(q => px > q.rm.x && px < q.rm.x + q.rm.w &&
     py > q.rm.y && py < q.rm.y + q.rm.h && netContains(q.rm, q.cuts, px, py));
+  const occW = (px, py) => occIn(netsW, px, py);
   const byLine = new Map();
   for(const rm of srcRooms){
     if(roomTilt(rm)) continue;
@@ -10012,10 +10328,11 @@ function wallPieces(roomsArg){
       if(b - a < 1) continue;
       const k = axis + ":" + c;
       if(!byLine.has(k)) byLine.set(k, []);
-      byLine.get(k).push({a, b, rk, base:roomBase(rm)});
+      byLine.get(k).push({a, b, rk, base:roomBase(rm), rid:rm.id, walled:roomWalled(rm)});
     }
   }
   const opensByLine = new Map();
+  const addOpen = (k, q) => { if(!opensByLine.has(k)) opensByLine.set(k, []); opensByLine.get(k).push(q); };
   for(const rm of srcRooms){
     if(roomTilt(rm)) continue;
     const obase = roomBase(rm);
@@ -10024,9 +10341,22 @@ function wallPieces(roomsArg){
       const c = axis === "v" ? o.x : o.y;
       const a = axis === "v" ? o.y : o.x;
       const k = axis + ":" + c;
-      if(!opensByLine.has(k)) opensByLine.set(k, []);
-      opensByLine.get(k).push({a, b:a + o.len, kind:o.kind, flip:!!o.flip,
-        base:obase, head:openHead(o), sill:openSill(o), oid:o.id, rid:rm.id});
+      const q = {a, b:a + o.len, kind:o.kind, flip:!!o.flip, base:obase, head:openHead(o), sill:openSill(o), oid:o.id, rid:rm.id, c};
+      addOpen(k, q);
+      /* an inserted internal wall has two faces one cavity apart: the same
+         gap is cut through the partner face so the door reads right through */
+      if(IW > 0){
+        for(const [k2, list] of byLine){
+          if(k2 === k || k2.slice(0,1) !== axis) continue;
+          const c2 = +k2.slice(2);
+          if(Math.abs(c2 - c) < 6 || Math.abs(c2 - c) > IW + 12) continue;
+          if(!list.some(sg => sg.rid !== rm.id && Math.min(sg.b, q.b) - Math.max(sg.a, q.a) > 40)) continue;
+          /* only when the cavity really is empty between the two faces */
+          const mid = (q.a + q.b)/2, cm = (c + c2)/2;
+          if(axis === "v" ? occIn(nets, cm, mid) : occIn(nets, mid, cm)) continue;
+          addOpen(k2, {...q, c:c2, ghost:true});
+        }
+      }
     }
   }
   const pieces = [];
@@ -10037,20 +10367,36 @@ function wallPieces(roomsArg){
     for(let i = 0; i < pts.length - 1; i++){
       const a = pts[i], b = pts[i+1];
       const mid = (a+b)/2;
-      let rk = -1, b0 = Infinity, b1 = -Infinity;
+      let rk = -1, b0 = Infinity, b1 = -Infinity, rid = null, ridW = null;
       for(const s of list) if(mid > s.a && mid < s.b){
         rk = Math.max(rk, s.rk);
         b0 = Math.min(b0, s.base);
         b1 = Math.max(b1, s.base);
+        if(!rid) rid = s.rid;
+        if(!ridW && s.walled) ridW = s.rid;
       }
       if(rk < 0) continue;
-      if(rk === 0){ pieces.push({axis, c, a, b, z0:b1, z1:b1+150, kerb:true}); continue; }
-      if(rk === 1){ pieces.push({axis, c, a, b, z0:b1+WH-250, z1:b1+WH, beam:true}); continue; }
+      if(rk === 0){ pieces.push({axis, c, a, b, z0:b1, z1:b1+150, kerb:true, rid}); continue; }
+      if(rk === 1){ pieces.push({axis, c, a, b, z0:b1+WH-250, z1:b1+WH, beam:true, rid}); continue; }
       const zTop = b1 + WH;
-      /* outside wall when the wall line has open air on exactly one side */
-      const s1 = axis === "v" ? occAt(c - 70, mid) : occAt(mid, c - 70);
-      const s2 = axis === "v" ? occAt(c + 70, mid) : occAt(mid, c + 70);
-      const extv = s1 !== s2;
+      /* which side is inside: the walled room this face belongs to sits
+         just off the line on one side. Outside wall when no walled room
+         stands on the other side, neither right against the line nor one
+         cavity away (an inserted internal wall has its partner face there) */
+      const pr = (d, along) => axis === "v" ? occW(c + d, along) : occW(along, c + d);
+      const inNeg = pr(-30, mid), inPos = pr(30, mid);
+      let out = 0;
+      if(inNeg !== inPos){
+        const o = inNeg ? +1 : -1;
+        const farOcc = pr(o*(IW + 30), mid) || pr(o*70, mid);
+        if(!farOcc) out = o;
+      }
+      const extv = out !== 0;
+      const thick = extv && EW > 0;
+      const wallRid = ridW || rid;
+      /* does the run really end here (a corner), or carry on past a junction? */
+      const endsAt = (pos, dir) => !pr(-out*40, pos + dir*40);
+      const capA = thick && endsAt(a, -1), capB = thick && endsAt(b, +1);
       /* full wall: carve openings */
       let ivs = [{a, b, kind:"solid"}];
       for(const gp of (opensByLine.get(k) || [])){
@@ -10059,20 +10405,40 @@ function wallPieces(roomsArg){
           if(iv.kind !== "solid" || gp.b <= iv.a || gp.a >= iv.b){ next.push(iv); continue; }
           if(gp.a > iv.a) next.push({a:iv.a, b:gp.a, kind:"solid"});
           next.push({a:Math.max(iv.a, gp.a), b:Math.min(iv.b, gp.b), kind:gp.kind, flip:gp.flip,
-            ob:gp.base, head:gp.head, sill:gp.sill, oid:gp.oid, rid:gp.rid});
+            ob:gp.base, head:gp.head, sill:gp.sill, oid:gp.oid, rid:gp.rid, ghost:gp.ghost});
           if(gp.b < iv.b) next.push({a:gp.b, b:iv.b, kind:"solid"});
         }
         ivs = next;
       }
+      const solid = (za, zb, ia, ib, extra) => {
+        pieces.push({axis, c, a:ia, b:ib, z0:za, z1:zb, ext:extv, out, rid:wallRid, inner:thick, ...(extra||{})});
+      };
+      /* thick outside wall: outer face and top cap, run out past convex
+         corners so the two faces meet; jamb and head reveals at openings */
+      const thickBits = (ia, ib, za, zb, corners) => {
+        if(!thick) return;
+        const ea = (corners && ia === a && capA) ? EW : 0, eb = (corners && ib === b && capB) ? EW : 0;
+        pieces.push({axis, c:c + out*EW, cin:c, a:ia - ea, b:ib + eb, z0:za, z1:zb, ext:true, out, rid:wallRid, outer:true});
+        pieces.push({axis, c, a:ia - ea, b:ib + eb, z0:zb, z1:zb, cap:true, out, thick:EW, rid:wallRid});
+      };
+      const reveal = (iv, zlo, zhi) => {
+        if(!thick) return;
+        pieces.push({axis, c, a:iv.a, b:iv.a, z0:zlo, z1:zhi, jamb:true, end:+1, out, thick:EW, rid:wallRid});
+        pieces.push({axis, c, a:iv.b, b:iv.b, z0:zlo, z1:zhi, jamb:true, end:-1, out, thick:EW, rid:wallRid});
+        pieces.push({axis, c, a:iv.a, b:iv.b, z0:zhi, z1:zhi, cap:true, under:true, out, thick:EW, rid:wallRid});
+        if(zlo > b0 + 1) pieces.push({axis, c, a:iv.a, b:iv.b, z0:zlo, z1:zlo, cap:true, out, thick:EW, rid:wallRid});
+      };
       for(const iv of ivs){
         if(iv.b - iv.a < 1) continue;
         if(iv.kind === "solid"){
-          pieces.push({axis, c, a:iv.a, b:iv.b, z0:b0, z1:zTop, ext:extv});
+          solid(b0, zTop, iv.a, iv.b);
+          thickBits(iv.a, iv.b, b0, zTop, true);
         } else if(iv.kind === "win"){
           const s0 = iv.ob + iv.sill, h0 = iv.ob + iv.head;
-          if(s0 > b0) pieces.push({axis, c, a:iv.a, b:iv.b, z0:b0, z1:s0, ext:extv});
-          pieces.push({axis, c, a:iv.a, b:iv.b, z0:s0, z1:h0, glass:true, frame:true, oid:iv.oid, rid:iv.rid});
-          if(zTop > h0) pieces.push({axis, c, a:iv.a, b:iv.b, z0:h0, z1:zTop, ext:extv});
+          if(s0 > b0){ solid(b0, s0, iv.a, iv.b); thickBits(iv.a, iv.b, b0, s0, false); }
+          if(!iv.ghost) pieces.push({axis, c, a:iv.a, b:iv.b, z0:s0, z1:h0, glass:true, frame:true, oid:iv.oid, rid:iv.rid});
+          if(zTop > h0){ solid(h0, zTop, iv.a, iv.b); thickBits(iv.a, iv.b, h0, zTop, false); }
+          reveal(iv, s0, h0);
           pieces.push({axis, c, a:iv.a, b:iv.b, z0:s0, z1:h0, hit:true, oid:iv.oid, rid:iv.rid});
         } else if(iv.kind === "slide"){
           /* sliding door: two glass panels from this room's floor to the
@@ -10080,15 +10446,19 @@ function wallPieces(roomsArg){
           const md = (iv.a + iv.b)/2, ov = Math.min(120, (iv.b - iv.a)*0.06);
           const sgn = iv.flip ? -1 : 1;
           const h0 = iv.ob + iv.head;
-          if(iv.ob > b0) pieces.push({axis, c, a:iv.a, b:iv.b, z0:b0, z1:iv.ob, ext:extv});
-          pieces.push({axis, c:c - sgn*35, a:iv.a, b:md + ov, z0:iv.ob, z1:h0, glass:true, frame:true, oid:iv.oid, rid:iv.rid});
-          pieces.push({axis, c:c + sgn*35, a:md - ov, b:iv.b, z0:iv.ob, z1:h0, glass:true, frame:true, oid:iv.oid, rid:iv.rid});
-          if(zTop > h0) pieces.push({axis, c, a:iv.a, b:iv.b, z0:h0, z1:zTop, ext:extv});
+          if(iv.ob > b0){ solid(b0, iv.ob, iv.a, iv.b); thickBits(iv.a, iv.b, b0, iv.ob, false); }
+          if(!iv.ghost){
+            pieces.push({axis, c:c - sgn*35, a:iv.a, b:md + ov, z0:iv.ob, z1:h0, glass:true, frame:true, oid:iv.oid, rid:iv.rid});
+            pieces.push({axis, c:c + sgn*35, a:md - ov, b:iv.b, z0:iv.ob, z1:h0, glass:true, frame:true, oid:iv.oid, rid:iv.rid});
+          }
+          if(zTop > h0){ solid(h0, zTop, iv.a, iv.b); thickBits(iv.a, iv.b, h0, zTop, false); }
+          reveal(iv, iv.ob, h0);
           pieces.push({axis, c, a:iv.a, b:iv.b, z0:iv.ob, z1:h0, hit:true, oid:iv.oid, rid:iv.rid});
         } else {
           const h0 = iv.ob + iv.head;
-          if(iv.ob > b0) pieces.push({axis, c, a:iv.a, b:iv.b, z0:b0, z1:iv.ob, ext:extv});
-          if(zTop > h0) pieces.push({axis, c, a:iv.a, b:iv.b, z0:h0, z1:zTop, ext:extv});
+          if(iv.ob > b0){ solid(b0, iv.ob, iv.a, iv.b); thickBits(iv.a, iv.b, b0, iv.ob, false); }
+          if(zTop > h0){ solid(h0, zTop, iv.a, iv.b); thickBits(iv.a, iv.b, h0, zTop, false); }
+          reveal(iv, iv.ob, h0);
           pieces.push({axis, c, a:iv.a, b:iv.b, z0:iv.ob, z1:h0, hit:true, oid:iv.oid, rid:iv.rid});
         }
       }
@@ -10191,6 +10561,7 @@ function build3DFaces(){
   const R3 = roofState();
   const bb3 = R3.type !== "none" ? roofBBox() : null;
   const xray3 = !!(view3 && view3.xray);
+  const roofOn3 = !(view3 && view3.roof === false) && R3.type !== "none";
   const clad3 = cladState();
 
   for(const rm of state.rooms){
@@ -10226,7 +10597,7 @@ function build3DFaces(){
     const g = roomGeom(rm);
     const lp = roomRotXY(rm, g.label.x, g.label.y);
     /* labels of rooms hidden under a solid roof stay off it; X-ray brings them back */
-    const roofed = bb3 && !xray3 && lp.x > bb3.x1 && lp.x < bb3.x2 && lp.y > bb3.y1 && lp.y < bb3.y2;
+    const roofed = bb3 && !xray3 && !(view3 && view3.roof === false) && underRoof(lp.x, lp.y);
     if(!roofed) labels.push({x:lp.x, y:lp.y, z:base+60, text:rm.name});
   }
 
@@ -10256,6 +10627,8 @@ function build3DFaces(){
       const dx = x - fam.px, dy = y - fam.py;
       return {x:fam.px + dx*fcs - dy*fsn, y:fam.py + dx*fsn + dy*fcs};
     };
+    const rotN = n => fam.deg ? [n[0]*fcs - n[1]*fsn, n[0]*fsn + n[1]*fcs, n[2]] : n;
+    const wallsOff = !!(view3 && view3.walls === false);
     for(const wp of wallPieces(fam.rooms)){
       const za = wp.z0, zb2 = wp.z1;
       const A = wp.axis === "v" ? FM(wp.c, wp.a) : FM(wp.a, wp.c);
@@ -10263,18 +10636,71 @@ function build3DFaces(){
       const L = Math.hypot(B2.x - A.x, B2.y - A.y) || 1;
       const n = [(B2.y - A.y)/L, -(B2.x - A.x)/L, 0];
       const pts = [[A.x,A.y,za],[B2.x,B2.y,za],[B2.x,B2.y,zb2],[A.x,A.y,zb2]];
+      const extCol = clad3.type !== "none" ? clad3.color : "#f4efe1";
+      if(wp.cap || wp.jamb){
+        /* the top of a thick outside wall, or the reveal beside / above an
+           opening cut through it. A wall top under the roof is never seen,
+           and would only fight the roof for the painter's order */
+        if(wallsOff) continue;
+        if(wp.under) continue;   /* a header's underside is never seen from above */
+        if(wp.cap && roofOn3 && bb3){
+          const mp = wp.axis === "v" ? FM(wp.c + wp.out*wp.thick/2, (wp.a + wp.b)/2) : FM((wp.a + wp.b)/2, wp.c + wp.out*wp.thick/2);
+          if(underRoof(mp.x, mp.y)) continue;
+        }
+        const c2 = wp.c + wp.out*wp.thick;
+        let P, nn;
+        if(wp.cap){
+          const A2 = wp.axis === "v" ? FM(c2, wp.a) : FM(wp.a, c2);
+          const B3 = wp.axis === "v" ? FM(c2, wp.b) : FM(wp.b, c2);
+          P = [[A.x,A.y,za],[B2.x,B2.y,za],[B3.x,B3.y,za],[A2.x,A2.y,za]];
+          nn = [0, 0, wp.under ? -1 : 1];
+        } else {
+          const A2 = wp.axis === "v" ? FM(c2, wp.a) : FM(wp.a, c2);
+          P = [[A.x,A.y,za],[A2.x,A2.y,za],[A2.x,A2.y,zb2],[A.x,A.y,zb2]];
+          nn = rotN(wp.axis === "v" ? [0, wp.end, 0] : [wp.end, 0, 0]);
+        }
+        /* a wall top sits under any raked infill or roof above it, so it
+           goes down early; nothing else overlaps it beyond a shared edge */
+        faces.push({pts:P, fill:lit(nn, extCol, 0.62), op:xop, stroke:"#4a473c", sw:0.7, wall:true, rid:wp.rid, bias:wp.cap ? -900 : 0, n3:wp.jamb ? nn : null});
+        continue;
+      }
       if(wp.hit){
         faces.push({pts, fill:"#000000", op:0, stroke:"none", sw:0, wall:true, hit:true, oid:wp.oid, rid:wp.rid});
       } else if(wp.glass){
         faces.push({pts, fill:"url(#glassG)", op:0.62, stroke:"#5f8aa5", sw:1.1, wall:true, glass:true, oid:wp.oid, rid:wp.rid});
+      } else if(wallsOff){
+        continue;
       } else if(wp.kerb){
-        faces.push({pts, fill:lit(n, "#d9d5c6", 0.6), op:xop, stroke:"#8a877a", sw:0.8, wall:true});
+        faces.push({pts, fill:lit(n, "#d9d5c6", 0.6), op:xop, stroke:"#8a877a", sw:0.8, wall:true, rid:wp.rid});
       } else if(wp.beam){
-        faces.push({pts, fill:lit(n, "#e4ddc9", 0.6), op:xop, stroke:"#434035", sw:1, wall:true});
+        faces.push({pts, fill:lit(n, "#e4ddc9", 0.6), op:xop, stroke:"#434035", sw:1, wall:true, rid:wp.rid});
       } else {
-        const cladOn = wp.ext && clad3.type !== "none";
+        /* a thick outside wall shows cladding on its outer skin only; the
+           inner skin and every internal wall stay plain */
+        const cladOn = wp.ext && clad3.type !== "none" && !wp.inner;
         const wallCol = cladOn ? clad3.color : "#f4efe1";
-        faces.push({pts, fill:lit(n, wallCol, 0.6), op:xop, stroke:"#434035", sw:1.1, wall:true});
+        const wallFill = lit(n, wallCol, 0.6);
+        /* the outer skin is one continuous surface to the eye, so its piece
+           seams stay faint; inside faces keep the crisp room outline. Long
+           runs are split so each piece sorts where it stands, which keeps a
+           wall end from poking past the roof edge in front of it */
+        const skinN = (wp.outer || wp.inner) ? rotN(wp.axis === "v" ? [wp.out * (wp.outer ? 1 : -1), 0, 0] : [0, wp.out * (wp.outer ? 1 : -1), 0]) : null;
+        const wallPick = {axis:wp.axis, c:wp.outer ? wp.cin : wp.c, a:wp.a, b:wp.b, z0:za, z1:zb2, fam:fam.deg ? {deg:fam.deg, px:fam.px, py:fam.py} : null};
+        const NP = Math.max(1, Math.min(12, Math.ceil(L/1500)));
+        const seamStroke = hexShade(wallFill, 0.86);
+        for(let i = 0; i < NP; i++){
+          const t0 = i/NP, t1 = (i+1)/NP;
+          const P0 = {x:A.x + (B2.x-A.x)*t0, y:A.y + (B2.y-A.y)*t0}, P1 = {x:A.x + (B2.x-A.x)*t1, y:A.y + (B2.y-A.y)*t1};
+          const sub = [[P0.x,P0.y,za],[P1.x,P1.y,za],[P1.x,P1.y,zb2],[P0.x,P0.y,zb2]];
+          /* a split seam inside a run stays faint on every face; the true
+             ends of a piece keep the crisp outline */
+          const inner = NP > 1;
+          faces.push({pts:sub, fill:wallFill, op:xop, stroke:(wp.outer || inner) ? seamStroke : "#434035", sw:wp.outer ? 0.8 : 1.1, wall:true, rid:wp.rid, ext3:!!wp.ext, n3:skinN, wallPick});
+        }
+        if(NP > 1 && !wp.outer){
+          /* redraw the outline of the whole run so a split face still reads as one wall */
+          faces.push({line:true, pts:[[A.x,A.y,za],[B2.x,B2.y,za],[B2.x,B2.y,zb2],[A.x,A.y,zb2],[A.x,A.y,za]], stroke:"#434035", sw:1.1, wall:true, bias:1});
+        }
         /* cladding pattern on outside faces: boards, panels or brick courses */
         if(cladOn && !xray3){
           const lc = hexShade(clad3.color, 0.7);
@@ -10334,14 +10760,15 @@ function build3DFaces(){
   }
 
   /* roof over the enclosed rooms — type, pitch, fall direction and overhang
-     all come from the Heights & roof panel (mirrored in the 3D bar) */
+     all come from the Heights & roof panel (mirrored in the 3D bar). The
+     roof can be a plain box over everything or follow the room outline. */
+  const roofOn = !(view3 && view3.roof === false);
   if(bb3){
     const T = 170;
     const rx1 = bb3.x1, ry1 = bb3.y1, rx2 = bb3.x2, ry2 = bb3.y2, zr0 = bb3.z0;
     const iron = R3.color, ironDk = hexShade(R3.color, 0.9), edge = hexShade(R3.color, 0.52);
-    const endCol = clad3.type !== "none" ? clad3.color : "#f1ecdd";
+    const endCol = clad3.type !== "none" ? clad3.color : "#f4efe1";
     const rop = xray3 ? 0.3 : undefined;   // X-ray sees through the roof too
-    const wl = {x1:rx1 + R3.over, y1:ry1 + R3.over, x2:rx2 - R3.over, y2:ry2 - R3.over};
     const nrm = (a, b, c) => {
       const u = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], v = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
       let n = [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]];
@@ -10349,54 +10776,72 @@ function build3DFaces(){
       const m = Math.hypot(...n) || 1;
       return n.map(q=>q/m);
     };
-    /* one planar roof slab over an axis-aligned rectangle, subdivided into
-       cells so the painter's sort can slot fixtures and walls around it */
-    const slab = (x1, y1, x2, y2, zAt) => {
-      const NX = Math.max(1, Math.min(10, Math.round((x2 - x1)/2600)));
-      const NY = Math.max(1, Math.min(10, Math.round((y2 - y1)/2600)));
-      for(let i = 0; i < NX; i++) for(let j = 0; j < NY; j++){
-        const xa = x1 + (x2 - x1)*i/NX, xb = x1 + (x2 - x1)*(i+1)/NX;
-        const ya = y1 + (y2 - y1)*j/NY, yb = y1 + (y2 - y1)*(j+1)/NY;
-        const cell = [[xa,ya],[xb,ya],[xb,yb],[xa,yb]].map(([X,Y]) => [X, Y, zAt(X,Y) + T]);
-        const n = nrm(cell[0], cell[1], cell[2]);
-        const fillC = lit(n, iron, 0.58);
-        faces.push({pts:cell, fill:fillC, op:rop, stroke:fillC, sw:0.6, roof:true});
+    const alongX = R3.ridge === "x" ? true : (R3.ridge === "y" ? false : (rx2 - rx1 >= ry2 - ry1));
+    const xm = (rx1 + rx2)/2, ym = (ry1 + ry2)/2;
+    /* the roof plan: one rectangle, or the room outline grown by the overhang;
+       a gable ridge splits the cells so each slope sorts on its own */
+    const exX = R3.type === "gable" && !alongX ? [xm] : [];
+    const exY = R3.type === "gable" && alongX ? [ym] : [];
+    const rc = roofFollows() ? roofCells(exX, exY) : rectUnion([{x1:rx1, y1:ry1, x2:rx2, y2:ry2}], exX, exY);
+    /* planar roof cells subdivided so the painter's sort can slot fixtures
+       and walls around them, then a crisp fascia band around the outline */
+    const slab = zAt => {
+      if(!roofOn || !rc) return;
+      for(const q of rc.cells){
+        /* small cells keep the painter's sort honest against wall tops
+           right under a flat roof */
+        const NX = Math.max(1, Math.min(16, Math.round(q.w/1500)));
+        const NY = Math.max(1, Math.min(16, Math.round(q.h/1500)));
+        for(let i = 0; i < NX; i++) for(let j = 0; j < NY; j++){
+          const xa = q.x + q.w*i/NX, xb = q.x + q.w*(i+1)/NX;
+          const ya = q.y + q.h*j/NY, yb = q.y + q.h*(j+1)/NY;
+          const cell = [[xa,ya],[xb,ya],[xb,yb],[xa,yb]].map(([X,Y]) => [X, Y, zAt(X,Y) + T]);
+          const n = nrm(cell[0], cell[1], cell[2]);
+          const fillC = lit(n, iron, 0.58);
+          faces.push({pts:cell, fill:fillC, op:rop, stroke:fillC, sw:0.6, roof:true});
+        }
       }
-      /* crisp outline and the fascia band around the slab edge */
-      const cor = [[x1,y1],[x2,y1],[x2,y2],[x1,y2]];
-      for(let i = 0; i < 4; i++){
-        const A = cor[i], B = cor[(i+1)%4];
+      for(const e of rc.edges){
+        const A = [e.x1, e.y1], B = [e.x2, e.y2];
         const zA = zAt(A[0], A[1]), zB = zAt(B[0], B[1]);
+        const nn = [e.nx, e.ny, 0];
         const Lh = Math.hypot(B[0]-A[0], B[1]-A[1]) || 1;
-        const nn = [(B[1]-A[1])/Lh, -(B[0]-A[0])/Lh, 0];
-        faces.push({pts:[[A[0],A[1],zA],[B[0],B[1],zB],[B[0],B[1],zB+T],[A[0],A[1],zA+T]],
-          fill:lit(nn, ironDk, 0.55), op:rop, stroke:edge, sw:0.9, roof:true});
+        const N = Math.max(1, Math.min(8, Math.round(Lh/3000)));
+        for(let i = 0; i < N; i++){
+          const t0 = i/N, t1 = (i+1)/N;
+          const P0 = [A[0] + (B[0]-A[0])*t0, A[1] + (B[1]-A[1])*t0], P1 = [A[0] + (B[0]-A[0])*t1, A[1] + (B[1]-A[1])*t1];
+          const z0 = zAt(P0[0], P0[1]), z1 = zAt(P1[0], P1[1]);
+          faces.push({pts:[[P0[0],P0[1],z0],[P1[0],P1[1],z1],[P1[0],P1[1],z1+T],[P0[0],P0[1],z0+T]],
+            fill:lit(nn, ironDk, 0.55), op:rop, stroke:edge, sw:0.9, roof:true, n3:nn});
+        }
         faces.push({line:true, pts:[[A[0],A[1],zA+T],[B[0],B[1],zB+T]], stroke:edge, sw:0.9, roof:true, bias:5});
       }
     };
-    /* corrugation ribs running down the slope, segmented like the cells */
+    /* corrugation ribs running down the slope, clipped to the roof cells */
     const ribs = (zAt, alongY) => {
-      if(xray3) return;
-      const RS = 920, SEG = 2600;
-      if(alongY){
-        const NS = Math.max(1, Math.round((ry2 - ry1)/SEG));
-        for(let x = rx1 + RS; x < rx2 - RS/2; x += RS)
-          for(let j = 0; j < NS; j++){
-            const ya = ry1 + (ry2 - ry1)*j/NS, yb = ry1 + (ry2 - ry1)*(j+1)/NS;
-            faces.push({line:true, pts:[[x, ya, zAt(x, ya) + T + 3],[x, yb, zAt(x, yb) + T + 3]], stroke:hexShade(R3.color, 0.72), op:0.5, sw:0.55, roof:true, bias:4});
-          }
-      } else {
-        const NS = Math.max(1, Math.round((rx2 - rx1)/SEG));
-        for(let y = ry1 + RS; y < ry2 - RS/2; y += RS)
-          for(let i = 0; i < NS; i++){
-            const xa = rx1 + (rx2 - rx1)*i/NS, xb = rx1 + (rx2 - rx1)*(i+1)/NS;
-            faces.push({line:true, pts:[[xa, y, zAt(xa, y) + T + 3],[xb, y, zAt(xb, y) + T + 3]], stroke:hexShade(R3.color, 0.72), op:0.5, sw:0.55, roof:true, bias:4});
-          }
+      if(xray3 || !roofOn || !rc) return;
+      const RS = 920, SEG = 2600, rc2 = hexShade(R3.color, 0.72);
+      for(const q of rc.cells){
+        if(alongY){
+          const NS = Math.max(1, Math.round(q.h/SEG));
+          for(let x = Math.ceil((q.x + RS/2)/RS)*RS; x < q.x + q.w - RS/2; x += RS)
+            for(let j = 0; j < NS; j++){
+              const ya = q.y + q.h*j/NS, yb = q.y + q.h*(j+1)/NS;
+              faces.push({line:true, pts:[[x, ya, zAt(x, ya) + T + 3],[x, yb, zAt(x, yb) + T + 3]], stroke:rc2, op:0.5, sw:0.55, roof:true, bias:4});
+            }
+        } else {
+          const NS = Math.max(1, Math.round(q.w/SEG));
+          for(let y = Math.ceil((q.y + RS/2)/RS)*RS; y < q.y + q.h - RS/2; y += RS)
+            for(let i = 0; i < NS; i++){
+              const xa = q.x + q.w*i/NS, xb = q.x + q.w*(i+1)/NS;
+              faces.push({line:true, pts:[[xa, y, zAt(xa, y) + T + 3],[xb, y, zAt(xb, y) + T + 3]], stroke:rc2, op:0.5, sw:0.55, roof:true, bias:4});
+            }
+        }
       }
     };
-    /* wall infill from the lowest wall top to the roof underside at the wall
-       line, so raked skillion sides, gable peaks and split-level walls all
-       read as walls instead of a floating lid */
+    /* wall infill from the lowest wall top to the roof underside along the
+       outside faces, so raked skillion sides, gable peaks and split-level
+       walls all read as walls instead of a floating lid */
     const zlo = Math.min(bb3.zlo, zr0);
     const infill = (A, B, zAtF) => {
       const zA = zAtF(A.x, A.y), zB = zAtF(B.x, B.y);
@@ -10408,41 +10853,38 @@ function build3DFaces(){
         const t0 = i/N, t1 = (i+1)/N;
         const P0 = {x:A.x + (B.x-A.x)*t0, y:A.y + (B.y-A.y)*t0};
         const P1 = {x:A.x + (B.x-A.x)*t1, y:A.y + (B.y-A.y)*t1};
+        const infCol = lit(nn, endCol, 0.6);
         faces.push({pts:[[P0.x,P0.y,zlo],[P1.x,P1.y,zlo],[P1.x,P1.y,zAtF(P1.x,P1.y)],[P0.x,P0.y,zAtF(P0.x,P0.y)]],
-          fill:lit(nn, endCol, 0.58), op:rop !== undefined ? rop : xop, stroke:"#4a473c", sw:0.7, wall:true, bias:-800});
+          fill:infCol, op:rop !== undefined ? rop : xop, stroke:hexShade(infCol, 0.86), sw:0.7, wall:true, bias:-800});
       }
     };
-    const infillRect = zU => {
-      for(const [A, B] of [
-        [{x:wl.x1,y:wl.y1},{x:wl.x2,y:wl.y1}], [{x:wl.x2,y:wl.y1},{x:wl.x2,y:wl.y2}],
-        [{x:wl.x2,y:wl.y2},{x:wl.x1,y:wl.y2}], [{x:wl.x1,y:wl.y2},{x:wl.x1,y:wl.y1}]
-      ]) infill(A, B, zU);
+    const infillWalls = zU => {
+      if(view3 && view3.walls === false) return;
+      const cu = rectUnion(coreRects());
+      for(const e of cu.edges) infill({x:e.x1, y:e.y1}, {x:e.x2, y:e.y2}, zU);
     };
     if(R3.type === "flat"){
-      slab(rx1, ry1, rx2, ry2, ()=>zr0);
+      slab(()=>zr0);
       ribs(()=>zr0, false);
-      if(bb3.zlo < zr0) infillRect(()=>zr0);
+      infillWalls(()=>zr0);
     } else if(R3.type === "skillion"){
       const zU = (x, y) => zr0 + skillionH(R3, bb3, x, y);
-      slab(rx1, ry1, rx2, ry2, zU);
+      slab(zU);
       ribs(zU, R3.dir === "N" || R3.dir === "S");
-      infillRect(zU);
+      infillWalls(zU);
     } else {
-      const alongX = R3.ridge === "x" ? true : (R3.ridge === "y" ? false : (rx2 - rx1 >= ry2 - ry1));
       if(alongX){
-        const ym = (ry1 + ry2)/2, rise = Math.tan(R3.gpitch*Math.PI/180) * (ry2 - ry1)/2;
+        const rise = Math.tan(R3.gpitch*Math.PI/180) * (ry2 - ry1)/2;
         const zU = (x, y) => zr0 + rise * (1 - Math.abs(y - ym)/((ry2 - ry1)/2));
-        slab(rx1, ry1, rx2, ym, zU);
-        slab(rx1, ym, rx2, ry2, zU);
+        slab(zU);
         ribs(zU, true);
-        infillRect(zU);
+        infillWalls(zU);
       } else {
-        const xm = (rx1 + rx2)/2, rise = Math.tan(R3.gpitch*Math.PI/180) * (rx2 - rx1)/2;
+        const rise = Math.tan(R3.gpitch*Math.PI/180) * (rx2 - rx1)/2;
         const zU = (x, y) => zr0 + rise * (1 - Math.abs(x - xm)/((rx2 - rx1)/2));
-        slab(rx1, ry1, xm, ry2, zU);
-        slab(xm, ry1, rx2, ry2, zU);
+        slab(zU);
         ribs(zU, false);
-        infillRect(zU);
+        infillWalls(zU);
       }
     }
   }
@@ -10736,7 +11178,12 @@ function render3D(){
   if(!view3) return;
   const p = state.plot;
   const cx = p.w/2, cy = p.d/2;
-  const {faces, labels} = build3DFaces();
+  const {faces:allFaces, labels} = build3DFaces();
+  /* the direction towards the viewer; faces of solid things that turn away
+     from it (the far fascia, a wall skin seen from behind) are dropped, so
+     they can never paint over what stands in front of them */
+  const Vv = [Math.sin(view3.theta)*Math.cos(view3.phi), Math.cos(view3.theta)*Math.cos(view3.phi), Math.sin(view3.phi)];
+  const faces = (view3.xray) ? allFaces : allFaces.filter(f => !f.n3 || (f.n3[0]*Vv[0] + f.n3[1]*Vv[1] + f.n3[2]*Vv[2]) > 1e-6);
   const selO = view3.sel && view3.sel.oid ? view3.sel : null;
   const selF = view3.sel && view3.sel.fid ? view3.sel : null;
   const selR = view3.sel && !view3.sel.oid && !view3.sel.fid && view3.sel.rid ? view3.sel : null;
@@ -10760,7 +11207,11 @@ function render3D(){
       continue;
     }
     const isSelGlass = selO && f.oid === selO.oid && !f.hit;
-    const data = (f.oid ? ` data-oid="${f.oid}" data-rid="${f.rid}"` : (f.fid ? ` data-fid="${f.fid}"` : (f.rid ? ` data-rid="${f.rid}"` : "")));
+    let data = (f.oid ? ` data-oid="${f.oid}" data-rid="${f.rid}"` : (f.fid ? ` data-fid="${f.fid}"` : (f.rid ? ` data-rid="${f.rid}"` : "")));
+    if(f.wallPick){
+      const W = f.wallPick, fm = W.fam;
+      data += ` data-wall="${W.axis}|${W.c}|${W.a}|${W.b}|${W.z0}|${W.z1}|${fm ? fm.deg : 0}|${fm ? fm.px : 0}|${fm ? fm.py : 0}|${f.ext3 ? 1 : 0}"`;
+    }
     const cls = f.hit ? ` class="hit3"` : (f.oid || f.rid || f.fid ? ` class="pick3"` : "");
     const stroke = isSelGlass ? "#1c7ed6" : f.stroke;
     const sw = isSelGlass ? f.sw*2.2 : f.sw;
@@ -10818,6 +11269,7 @@ function render3D(){
     }
   }
   const mw = maxX-minX, mh = maxY-minY, pad = Math.max(mw,mh)*0.06;
+  view3._fit = {minX, minY, mw, mh, pad};
   const z = view3.zoom;
   const vw = (mw+2*pad)/z, vh = (mh+2*pad)/z;
   const vx = minX-pad + (mw+2*pad - vw)/2 - (view3.panX||0);
@@ -10931,13 +11383,33 @@ function select3D(sel){
   }
   render3D();
 }
+const VIEW3_HOME = {theta:-0.6, phi:0.82};
+/* set viewpoints: theta turns the plan under the camera, phi tilts it.
+   The camera sits on the side of the plan the name says; "front" is the
+   top of the plan, where the front setback and its label are. */
+const VIEW3_PRESETS = {
+  iso:{theta:VIEW3_HOME.theta, phi:VIEW3_HOME.phi},
+  nw:{theta:-3*Math.PI/4, phi:0.62}, ne:{theta:3*Math.PI/4, phi:0.62},
+  se:{theta:Math.PI/4, phi:0.62},    sw:{theta:-Math.PI/4, phi:0.62},
+  n:{theta:Math.PI, phi:0.3}, e:{theta:Math.PI/2, phi:0.3}, s:{theta:0, phi:0.3}, w:{theta:-Math.PI/2, phi:0.3},
+  top:{theta:0, phi:1.5}
+};
+function setView3(pre){
+  if(!view3 || !pre) return;
+  view3.theta = pre.theta; view3.phi = pre.phi;
+  view3.zoom = 1; view3.panX = 0; view3.panY = 0;
+  render3D();
+}
 function open3D(){
-  view3 = view3 || {theta:-0.6, phi:1.05, zoom:1, panX:0, panY:0, labels:true, fixtures:true, xray:false, tod:10, sel:null};
+  view3 = view3 || {theta:VIEW3_HOME.theta, phi:VIEW3_HOME.phi, zoom:1, panX:0, panY:0, labels:true, fixtures:true, xray:false, roof:true, tod:10, sel:null};
   if(!Number.isFinite(view3.tod)) view3.tod = 10;
+  if(view3.roof === undefined) view3.roof = true;
   $("view3d").classList.add("open");
   $("btn3dLabels").classList.toggle("toggled", view3.labels);
   $("btn3dFix").classList.toggle("toggled", view3.fixtures);
   $("btn3dXray").classList.toggle("toggled", !!view3.xray);
+  $("btn3dRoof").classList.toggle("toggled", view3.roof !== false);
+  $("sel3dView").value = "";
   $("in3dWall").value = wallH3();
   $("in3dFloor").value = floorH3();
   const R = roofState();
@@ -11008,13 +11480,25 @@ function sync3DPanel(){
     setV("p3Lvl", Math.round(rm.lvl || 0));
     const base = roomBase(rm);
     $("p3Base").textContent = `floor sits ${base} mm above the ground`;
-    $("p3Hint").textContent = "Floor level is this room's height relative to the whole building's Floor height. Stairs and entry steps re-read it as it changes.";
+    $("p3Hint").textContent = "Floor level is this room's height relative to the whole building's Floor height. Stairs and entry steps re-read it as it changes. Double-click any wall to add a window or door exactly where you point.";
   }
 }
 
 $("btn3d").addEventListener("click", open3D);
 $("btn3dClose").addEventListener("click", close3D);
-$("btn3dReset").addEventListener("click", ()=>{ view3.theta=-0.6; view3.phi=1.05; view3.zoom=1; view3.panX=0; view3.panY=0; render3D(); });
+$("btn3dReset").addEventListener("click", ()=>{ setView3(VIEW3_PRESETS.iso); });
+$("btn3dRoof").addEventListener("click", ()=>{ view3.roof = view3.roof === false; $("btn3dRoof").classList.toggle("toggled", view3.roof); render3D(); });
+$("sel3dView").addEventListener("change", ()=>{
+  const v = $("sel3dView").value;
+  if(VIEW3_PRESETS[v]) setView3(VIEW3_PRESETS[v]);
+  $("sel3dView").value = "";
+  $("sel3dView").blur();
+});
+$("btn3dHelp").addEventListener("click", ()=>{
+  const h = $("help3d");
+  h.style.display = h.style.display === "none" ? "block" : "none";
+  $("btn3dHelp").classList.toggle("toggled", h.style.display !== "none");
+});
 $("btn3dLabels").addEventListener("click", ()=>{ view3.labels=!view3.labels; $("btn3dLabels").classList.toggle("toggled", view3.labels); render3D(); });
 $("btn3dFix").addEventListener("click", ()=>{ view3.fixtures=!view3.fixtures; $("btn3dFix").classList.toggle("toggled", view3.fixtures); render3D(); });
 $("btn3dXray").addEventListener("click", ()=>{ view3.xray=!view3.xray; $("btn3dXray").classList.toggle("toggled", view3.xray); render3D(); });
@@ -11190,19 +11674,103 @@ $("svg3d").addEventListener("pointerup", e=>{
     drag3 = null;
     return;
   }
-  /* a still click on empty space clears the pick; on a floor it picks the room */
+  /* a still click on empty space clears the pick; on a floor or wall it
+     picks the room. Two still clicks in quick succession are a double-click
+     (the browser's own dblclick never fires here, because every render
+     rebuilds the picture between the two clicks): on a wall that adds an
+     opening, on empty ground it resets the view. */
   if(drag3 && drag3.mode === "spin" && Math.abs(e.clientX - drag3.sx) + Math.abs(e.clientY - drag3.sy) < 4){
     const t = drag3.target;
+    const now = performance.now();
+    const last = view3._lastClick;
+    const isDbl = last && now - last.t < 450 && Math.abs(e.clientX - last.x) < 6 && Math.abs(e.clientY - last.y) < 6;
+    view3._lastClick = isDbl ? null : {t:now, x:e.clientX, y:e.clientY};
+    if(isDbl && t && t.dataset && t.dataset.wall){
+      drag3 = null; $("svg3d").classList.remove("dragging");
+      addOpeningOnWall3(e, t);
+      return;
+    }
+    if(isDbl && !(t && t.dataset && (t.dataset.oid || t.dataset.fid || t.dataset.rid))){
+      drag3 = null; $("svg3d").classList.remove("dragging");
+      setView3(VIEW3_PRESETS.iso);
+      return;
+    }
     if(t && t.dataset && t.dataset.rid && !t.dataset.oid) select3D({rid:t.dataset.rid});
     else if(view3.sel) select3D(null);
   }
   drag3 = null; $("svg3d").classList.remove("dragging");
 });
-$("svg3d").addEventListener("dblclick", ()=>{ view3.theta=-0.6; view3.phi=1.05; view3.zoom=1; view3.panX=0; view3.panY=0; render3D(); });
+$("svg3d").addEventListener("dblclick", e=>{ e.preventDefault(); });
+/* pointer position on a wall face: millimetres along the wall from its
+   start and height above its base, solved from the two screen vectors of
+   the wall plane (parallel projection, so the plane maps linearly) */
+function wallPointAt3(e, W){
+  const rad = W.deg * Math.PI/180, fcs = Math.cos(rad), fsn = Math.sin(rad);
+  const FM = (x, y) => W.deg ? {x:W.px + (x-W.px)*fcs - (y-W.py)*fsn, y:W.py + (x-W.px)*fsn + (y-W.py)*fcs} : {x, y};
+  const A = W.axis === "v" ? FM(W.c, W.a) : FM(W.a, W.c);
+  const B = W.axis === "v" ? FM(W.c, W.b) : FM(W.b, W.c);
+  const L = Math.hypot(B.x - A.x, B.y - A.y) || 1;
+  const dir = {x:(B.x - A.x)/L, y:(B.y - A.y)/L};
+  const q = svgPt3(e);
+  const p0 = proj3(A.x, A.y, W.z0, view3._cx, view3._cy);
+  const va = screenStep3(A.x, A.y, W.z0, dir.x, dir.y, 0);
+  const vz = screenStep3(A.x, A.y, W.z0, 0, 0, 1);
+  const dx = q.x - p0.X, dy = q.y - p0.Y;
+  const det = va.x*vz.y - va.y*vz.x;
+  if(Math.abs(det) < 1e-9) return null;
+  const sMM = (dx*vz.y - dy*vz.x)/det * 1000;
+  const zMM = (va.x*dy - va.y*dx)/det * 1000;
+  return {s:Math.max(0, Math.min(L, sMM)), z:W.z0 + zMM, L};
+}
+function addOpeningOnWall3(e, t){
+  const f = t.dataset.wall.split("|");
+  const W = {axis:f[0], c:+f[1], a:+f[2], b:+f[3], z0:+f[4], z1:+f[5], deg:+f[6], px:+f[7], py:+f[8], ext:f[9] === "1"};
+  const rm = state.rooms.find(r => r.id === t.dataset.rid);
+  if(!rm) return;
+  const hit = wallPointAt3(e, W);
+  if(!hit) return;
+  const kind = W.ext ? "win" : "door";
+  const want = kind === "win" ? 1200 : 870;
+  const len = Math.max(MIN_OPEN, Math.min(want, Math.floor((hit.L - 100)/50)*50));
+  if(len < MIN_OPEN) return;
+  let start = Math.round((W.a + hit.s - len/2)/50)*50;
+  start = Math.max(W.a, Math.min(W.b - len, start));
+  /* a tilted room's walls were laid out on its axis-aligned twin: shift the
+     opening back by the twin's offset so it lands on the real room */
+  let tx = 0, ty = 0;
+  if(roomTilt(rm)){
+    const G = angleGroups().find(g => g.rooms.includes(rm));
+    if(G){ const vr = G.virt[G.rooms.indexOf(rm)]; tx = vr.x - rm.x; ty = vr.y - rm.y; }
+  }
+  pushUndo();
+  if(!rm.open) rm.open = [];
+  const o = {id:newId("o"), x:(W.axis === "v" ? W.c : start) - tx, y:(W.axis === "v" ? start : W.c) - ty,
+             len, orient:W.axis === "v" ? "v" : "h", kind, flip:false, hinge:"a"};
+  if(kind === "win") o.sill = 900;
+  rm.open.push(o);
+  select3D({rid:rm.id, oid:o.id});
+  renderWorld(); renderProps();
+  $("p3Hint").textContent = (kind === "win" ? "Window added on the outside wall" : "Door added on the inside wall") + " — change Kind above, drag the handles, or Delete to take it away.";
+}
 $("svg3d").addEventListener("contextmenu", e=>e.preventDefault());
 $("svg3d").addEventListener("wheel", e=>{
   e.preventDefault();
-  view3.zoom = Math.max(0.4, Math.min(6, view3.zoom * (e.deltaY < 0 ? 1.12 : 1/1.12)));
+  const z0 = view3.zoom;
+  const z1 = Math.max(0.4, Math.min(8, z0 * (e.deltaY < 0 ? 1.12 : 1/1.12)));
+  const F = view3._fit;
+  if(F){
+    /* keep the point under the pointer where it is */
+    const q = svgPt3(e);
+    const span = F.mw + 2*F.pad, spanY = F.mh + 2*F.pad;
+    const vw0 = span/z0, vh0 = spanY/z0;
+    const vx0 = F.minX - F.pad + (span - vw0)/2 - (view3.panX || 0);
+    const vy0 = F.minY - F.pad + (spanY - vh0)/2 - (view3.panY || 0);
+    const fx = (q.x - vx0)/vw0, fy = (q.y - vy0)/vh0;
+    const vw1 = span/z1, vh1 = spanY/z1;
+    view3.panX = F.minX - F.pad + (span - vw1)/2 - (q.x - fx*vw1);
+    view3.panY = F.minY - F.pad + (spanY - vh1)/2 - (q.y - fy*vh1);
+  }
+  view3.zoom = z1;
   render3D();
 }, {passive:false});
 
@@ -11265,6 +11833,34 @@ $("p3Lvl").addEventListener("change", ()=>{
   commit3(); renderRoofPanel();
 });
 $("p3Close").addEventListener("click", ()=>{ select3D(null); });
+/* quick add from the room panel: the longest suitable wall of the room,
+   outside wall for a window, shared wall for a door */
+function addOpeningToRoom3(rm, kind){
+  if(!rm) return;
+  const rooms = roomTilt(rm) ? (angleGroups().find(g => g.rooms.includes(rm)) || {virt:null}).virt : null;
+  const vr = rooms ? rooms[angleGroups().find(g => g.rooms.includes(rm)).rooms.indexOf(rm)] : rm;
+  const pcs = wallPieces(rooms || undefined).filter(p => p.rid === rm.id && !p.hit && !p.glass && !p.cap && !p.jamb && !p.outer && !p.kerb && !p.beam && p.z1 - p.z0 > 1000);
+  const want = pcs.filter(p => kind === "win" ? p.ext : !p.ext);
+  const pool = want.length ? want : pcs;
+  if(!pool.length) return;
+  pool.sort((a, b) => (b.b - b.a) - (a.b - a.a));
+  const P = pool[0];
+  const L = P.b - P.a;
+  const len = Math.max(MIN_OPEN, Math.min(kind === "win" ? 1200 : 870, Math.floor((L - 100)/50)*50));
+  if(len < MIN_OPEN) return;
+  const start = Math.max(P.a, Math.min(P.b - len, Math.round((P.a + L/2 - len/2)/50)*50));
+  const tx = vr.x - rm.x, ty = vr.y - rm.y;
+  pushUndo();
+  if(!rm.open) rm.open = [];
+  const o = {id:newId("o"), x:(P.axis === "v" ? P.c : start) - tx, y:(P.axis === "v" ? start : P.c) - ty,
+             len, orient:P.axis === "v" ? "v" : "h", kind, flip:false, hinge:"a"};
+  if(kind === "win") o.sill = 900;
+  rm.open.push(o);
+  select3D({rid:rm.id, oid:o.id});
+  renderWorld(); renderProps();
+}
+$("p3AddWin").addEventListener("click", ()=>{ const sel = view3 && view3.sel; addOpeningToRoom3(sel && state.rooms.find(r=>r.id===sel.rid), "win"); });
+$("p3AddDoor").addEventListener("click", ()=>{ const sel = view3 && view3.sel; addOpeningToRoom3(sel && state.rooms.find(r=>r.id===sel.rid), "door"); });
 function sel3Fix(){
   const sel = view3 && view3.sel;
   if(!sel || !sel.fid) return null;
@@ -11336,6 +11932,8 @@ function renderRoofPanel(){
   $("rfSkill").style.display = R.type === "skillion" ? "block" : "none";
   $("rfGable").style.display = R.type === "gable" ? "block" : "none";
   $("rfOverRow").style.display = R.type === "none" ? "none" : "flex";
+  $("rfFitRow").style.display = R.type === "none" ? "none" : "flex";
+  setV("rfFit", R.fit || "box");
   $("rfShowRow").style.display = R.type === "none" ? "none" : "flex";
   setV("rfPitch", R.pitch); setV("rfPitchSl", R.pitch);
   setV("rfGPitch", R.gpitch); setV("rfGPitchSl", R.gpitch);
@@ -11424,6 +12022,7 @@ $("rfOver").addEventListener("change", ()=>{
   pushUndo(); roofState().over = Math.max(0, Math.min(1500, v)); roofChanged();
 });
 $("rfShow").addEventListener("change", ()=>{ roofState().show2d = $("rfShow").checked; renderWorld(); });
+$("rfFit").addEventListener("change", ()=>{ pushUndo(); roofState().fit = $("rfFit").value === "follow" ? "follow" : "box"; roofChanged(); });
 $("rfColor").addEventListener("change", ()=>{
   pushUndo();
   roofState().color = $("rfColor").value;
