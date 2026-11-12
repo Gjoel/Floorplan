@@ -326,6 +326,8 @@
     <option value="2">Sched cols: 2</option>
     <option value="3">Sched cols: 3</option>
   </select>
+  <button id="btnSchedCompact" title="Compact schedule: boundary runs that share a bearing (E2.1, E2.2 …) are merged into one line with their total length, so the schedule is shorter and easier to read on a printed page">Compact sched</button>
+  <button id="btnSchedCopy" title="Copy the room schedule, lots, boundary bearings and split lines as a table you can paste straight into Word, Google Docs or Excel">Copy schedule</button>
   <button id="btnNotes" title="Include the general notes block (Australian standards) on SVG and PNG exports">Notes</button>
   <button id="btnModules" title="Overlay the module grid. Drag a join line to adjust where modules split">Modules</button>
   <button id="btn3d" title="View the plan as a simple 3D model. Drag to orbit, wheel to zoom">3D</button>
@@ -554,6 +556,12 @@
           <option value="50">50 mm</option>
         </select>
       </div>
+    </div>
+
+    <div class="section">
+      <h3>Schedule</h3>
+      <div class="row"><label for="schedTitleIn" title="The heading printed at the top of the schedule on the plan and on every export">Title</label><input type="text" id="schedTitleIn" placeholder="Room schedule"></div>
+      <label class="ckrow"><input type="checkbox" id="schedHouse" title="Interior, covered, outdoor / alfresco, carport / garage, total footprint and site coverage rows. Untick for a subdivision or lot layout with no homes on it."> House area totals (interior, covered, carport, footprint, site cover)</label>
     </div>
 
     <div class="section">
@@ -1344,6 +1352,9 @@ function defaultState(){
     legend:true,
     legendPos:null,
     schedCols:"auto",
+    schedCompact:false,
+    schedTitle:"Room schedule",
+    schedHouse:true,
     notes:true,
     sbMode:"scale",
     site:null,
@@ -1701,6 +1712,11 @@ function qRot(d){ return Math.round(d * ROT_Q) / ROT_Q; }
    ============================================================ */
 const view = {s:0.04, tx:60, ty:60};
 const LEG_W = 7200;      // legend panel width, mm
+function schedTitle(){
+  const t = typeof state.schedTitle === "string" ? state.schedTitle.trim() : "";
+  return t || "Room schedule";
+}
+function schedHouseOn(){ return state.schedHouse !== false; }
 function schedClearOn(){ return !!(state.schedClear && sitePolyActive()); }
 function legWidth(){ return schedClearOn() ? 9000 : LEG_W; }
 const LEG_GAP = 1500;    // gap between plot and legend, mm
@@ -3799,7 +3815,7 @@ function legendSvg(x0, y0, forExport, colsArg){
     F(120, false, (cx, yt)=> hline(cx, yt + 120));
     F(rowH, false, (cx, yt)=>{
       body += `<text class="legend-txt" x="${cx+c1o}" y="${yt + rowH - 140}" font-size="255" font-weight="bold" fill="${ink}">Lots</text>`;
-      body += `<text class="legend-txt" x="${cx+c3o}" y="${yt + rowH - 140}" font-size="230" fill="${mut}" text-anchor="end">area · site cover</text>`;
+      body += `<text class="legend-txt" x="${cx+c3o}" y="${yt + rowH - 140}" font-size="230" fill="${mut}" text-anchor="end">${schedHouseOn() ? "area · site cover" : "area"}</text>`;
     });
     lotList().forEach((lot, li) => {
       const la = lotAreaM2(lot);
@@ -3807,7 +3823,7 @@ function legendSvg(x0, y0, forExport, colsArg){
       F(rowH, false, (cx, yt)=>{
         const y = yt + rowH;
         body += `<text class="legend-txt" x="${cx+c1o}" y="${y-140}" font-size="245" fill="${lotTint(li)}">${esc(lot.name || "Lot")}</text>`;
-        body += `<text class="legend-txt" x="${cx+c3o}" y="${y-140}" font-size="245" fill="${ink}" text-anchor="end" font-family="Consolas, monospace">${la.toFixed(1)} m² · ${la > 0 ? (100*fp/la).toFixed(1) : "–"}%</text>`;
+        body += `<text class="legend-txt" x="${cx+c3o}" y="${y-140}" font-size="245" fill="${ink}" text-anchor="end" font-family="Consolas, monospace">${la.toFixed(1)} m²${schedHouseOn() ? " · " + (la > 0 ? (100*fp/la).toFixed(1) : "–") + "%" : ""}</text>`;
       });
     });
   }
@@ -3818,7 +3834,7 @@ function legendSvg(x0, y0, forExport, colsArg){
       body += `<text class="legend-txt" x="${cx+c1o}" y="${yt + rowH - 140}" font-size="255" font-weight="bold" fill="${ink}">Block boundary</text>`;
       body += `<text class="legend-txt" x="${cx+c3o}" y="${yt + rowH - 140}" font-size="230" fill="${mut}" text-anchor="end">bearing · length</text>`;
     });
-    for(const r of allBlockRuns()){
+    for(const r of schedBlockRuns()){
       const brg = fmtDeg(bearingDeg(r.a, r.b));
       const ln = (r.arc/1000).toFixed(3) + " m" + (r.R ? " · R " + (r.R/1000).toFixed(2) : "");
       F(400, false, (cx, yt)=>{
@@ -3845,21 +3861,22 @@ function legendSvg(x0, y0, forExport, colsArg){
       }
     }
   }
-  F(120, false, (cx, yt)=> hline(cx, yt + 120));
-  for(const cr of catRows){
+  const house = schedHouseOn();
+  if(house) F(120, false, (cx, yt)=> hline(cx, yt + 120));
+  if(house) for(const cr of catRows){
     F(rowH, false, (cx, yt)=>{
       const y = yt + rowH;
       body += `<text class="legend-txt" x="${cx+c1o}" y="${y-140}" font-size="245" fill="${ink}">${cr[0]}</text>`;
       body += `<text class="legend-txt" x="${cx+c3o}" y="${y-140}" font-size="245" fill="${ink}" text-anchor="end" font-family="Consolas, monospace">${cr[1].toFixed(1)} m²</text>`;
     });
   }
-  F(120, false, (cx, yt)=> hline(cx, yt + 120));
-  F(rowH, false, (cx, yt)=>{
+  if(house) F(120, false, (cx, yt)=> hline(cx, yt + 120));
+  if(house) F(rowH, false, (cx, yt)=>{
     const y = yt + rowH;
     body += `<text class="legend-txt" x="${cx+c1o}" y="${y-140}" font-size="255" font-weight="bold" fill="${ink}">Total footprint</text>`;
     body += `<text class="legend-txt" x="${cx+c3o}" y="${y-140}" font-size="255" font-weight="bold" fill="${ink}" text-anchor="end" font-family="Consolas, monospace">${footprint.toFixed(1)} m²</text>`;
   });
-  F(rowH, false, (cx, yt)=>{
+  if(house) F(rowH, false, (cx, yt)=>{
     const y = yt + rowH;
     body += `<text class="legend-txt" x="${cx+c1o}" y="${y-140}" font-size="255" font-weight="bold" fill="${ink}">Site coverage</text>`;
     body += `<text class="legend-txt" x="${cx+c3o}" y="${y-140}" font-size="255" font-weight="bold" fill="${ink}" text-anchor="end" font-family="Consolas, monospace">${coverage.toFixed(1)}% of ${plotArea.toFixed(1)} m²${lotArea !== null ? " lot" : ""}</text>`;
@@ -3963,7 +3980,7 @@ function legendSvg(x0, y0, forExport, colsArg){
   const totW = nCols * colW;
   let s = "";
   s += `<rect x="${x0}" y="${y0}" width="${totW}" height="${totalH}" fill="#ffffff" ${forExport ? 'stroke="#999999" stroke-width="20"' : 'stroke="var(--line)" stroke-width="1.2px" vector-effect="non-scaling-stroke"'} rx="120"/>`;
-  s += `<text class="legend-txt" x="${x0+pad}" y="${titleBase}" font-size="380" font-weight="bold" fill="${ink}">Room schedule</text>`;
+  s += `<text class="legend-txt" x="${x0+pad}" y="${titleBase}" font-size="380" font-weight="bold" fill="${ink}">${esc(schedTitle())}</text>`;
   for(let c = 1; c < nCols; c++){
     s += `<line x1="${x0 + c*colW}" y1="${colTop - 60}" x2="${x0 + c*colW}" y2="${y0 + totalH - pad}" stroke="${bord}" ${lnw}/>`;
   }
@@ -7152,6 +7169,12 @@ function syncLegendBtn(){
   $("btnNotes").classList.toggle("toggled", state.notes !== false);
   const scSel = $("schedColsSel");
   if(scSel) scSel.value = [1,2,3].includes(state.schedCols) ? String(state.schedCols) : "auto";
+  const cpB = $("btnSchedCompact");
+  if(cpB) cpB.classList.toggle("toggled", !!state.schedCompact);
+  const stIn = $("schedTitleIn");
+  if(stIn && document.activeElement !== stIn) stIn.value = schedTitle();
+  const shCk = $("schedHouse");
+  if(shCk) shCk.checked = state.schedHouse !== false;
   const modOn = !!(state.mod && state.mod.show && state.mod.w > 0);
   $("btnModules").classList.toggle("toggled", modOn);
   $("modSection").style.display = modOn ? "block" : "none";
@@ -7183,6 +7206,24 @@ $("btnLegend").addEventListener("click", ()=>{
 $("schedColsSel").addEventListener("change", ()=>{
   const v = $("schedColsSel").value;
   state.schedCols = (v === "1" || v === "2" || v === "3") ? +v : "auto";
+});
+$("btnSchedCompact").addEventListener("click", ()=>{
+  pushUndo();
+  state.schedCompact = !state.schedCompact;
+  syncLegendBtn();
+  renderAll();
+  flashHint(state.schedCompact ? "Compact schedule on: boundary runs with the same bearing are merged" : "Compact schedule off: every boundary run is listed");
+});
+$("btnSchedCopy").addEventListener("click", copyScheduleTable);
+$("schedTitleIn").addEventListener("focus", ()=> pushUndo());
+$("schedTitleIn").addEventListener("input", ()=>{
+  state.schedTitle = $("schedTitleIn").value.slice(0, 80);
+  renderWorld();
+});
+$("schedHouse").addEventListener("change", ()=>{
+  pushUndo();
+  state.schedHouse = $("schedHouse").checked;
+  renderAll();
 });
 $("btnReset").addEventListener("click", ()=>{
   if(!confirm("Replace the current plan with the original beachside concept?")) return;
@@ -8139,6 +8180,9 @@ $("fileInput").addEventListener("change", e => {
         legendPos:(d.legendPos && Number.isFinite(+d.legendPos.x) && Number.isFinite(+d.legendPos.y))
           ? {x:Math.round(+d.legendPos.x), y:Math.round(+d.legendPos.y)} : null,
         schedCols:[1,2,3].includes(+d.schedCols) ? +d.schedCols : "auto",
+        schedCompact:!!d.schedCompact,
+        schedTitle:typeof d.schedTitle === "string" ? d.schedTitle.slice(0, 80) : "Room schedule",
+        schedHouse:d.schedHouse !== false,
         notes:d.notes === undefined ? true : !!d.notes,
         sbMode:d.sbMode === "fixed" ? "fixed" : "scale",
         round:[1,5,10,50].includes(+d.round) ? +d.round : 1,
@@ -8621,10 +8665,18 @@ function exportDims(showArg){
   const ML = lanes ? Math.max(2600, 900 + leftOut) : 900;
   const MR = lanes ? 1100 : 700;
   const TOP = Math.max(lanes ? 6000 : 4600, 3900 + topOut);
+  /* a sheet with nothing of the plan on it (the "Schedule & notes only"
+     preset) lays the schedule and notes out on their own: schedule from the
+     top left, notes in a column beside it, ignoring where the schedule was
+     dragged on the working view, so they fill the page instead of hanging
+     off the right of an invisible plan */
+  const planFree = !!showArg && !["walls","roomFills","roomNames","boundary","lotFills","survey","layers","areas","fixtures"]
+    .some(k => SH[k] !== false);
   /* schedule columns: honour a forced 1/2/3, otherwise pick the fewest
      columns that let the schedule plus the notes stack fit beside the plan
      so the sheet reads landscape */
   let cols = [1,2,3].includes(state.schedCols) ? state.schedCols : 0;
+  if(!cols && planFree) cols = 2;
   if(!cols){
     if(!wantLeg) cols = 1;
     else {
@@ -8641,23 +8693,23 @@ function exportDims(showArg){
   const kSch = fsK("sched"), kNot = fsK("notes");
   const leg0 = wantLeg ? legendSvg(0, 0, true, cols) : {svg:"", height:0, width:0};
   const leg = {svg:leg0.svg, width:leg0.width*kSch, height:leg0.height*kSch};
-  const custom = wantLeg && !!state.legendPos;
+  const custom = wantLeg && !!state.legendPos && !planFree;
   /* the schedule and the general notes share a column to the right of the
      plan so the sheet reads landscape; a schedule the user has dragged
      somewhere renders wherever it was put and the notes take the column */
-  const colX = p.w + Math.max(rightOut, 300) + LEG_GAP;
+  const colX = planFree ? 0 : p.w + Math.max(rightOut, 300) + LEG_GAP;
   const lp = custom ? {...state.legendPos} : {x:colX, y:0};
   if(custom){ lp.y = Math.max(lp.y, -(TOP - 4200)); lp.x = Math.max(lp.x, -(ML - 400)); }
   const legRight  = wantLeg ? lp.x + leg.width  : 0;
   const legBottom = wantLeg ? lp.y + leg.height : 0;
-  const notesX = colX;
-  const notesW = Math.max(leg0.width || 0, 10800);
-  const notesY = (wantLeg && !custom) ? legBottom + 700 : 0;
+  const notesX = (planFree && wantLeg) ? legRight + 1500 : colX;
+  const notesW = planFree ? 12000 : Math.max(leg0.width || 0, 10800);
+  const notesY = (wantLeg && !custom && !planFree) ? legBottom + 700 : 0;
   const notes = wantNotes ? exportNotesLayout(notesW) : {lines:[], font:230, lh:330, height:0};
   const notesRight  = notes.lines.length ? notesX + notesW*kNot : 0;
   const notesBottom = notes.lines.length ? notesY + notes.height*kNot : 0;
-  const W = ML + Math.max(p.w + rightOut, legRight, notesRight) + MR;
-  const contentBottom = Math.max(p.d + botOut + 300, legBottom + 400, notesBottom + 100);
+  const W = ML + Math.max(planFree ? 0 : p.w + rightOut, legRight, notesRight) + MR;
+  const contentBottom = Math.max(planFree ? 0 : p.d + botOut + 300, legBottom + 400, notesBottom + 100);
   const H = TOP + contentBottom + 600;
   return {ML, MR, TOP, W, H, notes, notesX, notesY, notesW, contentBottom, lp, cols, leg, L, wantLeg, wantNotes};
 }
@@ -16860,6 +16912,135 @@ function allBlockRuns(){
   const out = [];
   const pr = parentRing();
   for(let i=0;i<pr.pts.length;i++) out.push(...blockEdgeRuns(i));
+  return out;
+}
+/* "Copy schedule": the same figures the room schedule prints, put on the
+   clipboard as a real table (HTML for Word / Google Docs, tab-separated
+   text for Excel) so a report can carry them as text, not a picture */
+function scheduleTableSections(){
+  const secs = [];
+  const groups = [], byKey = new Map();
+  for(const rm of state.rooms){
+    const g = roomGeom(rm);
+    const key = (rm.sched||"").trim() || ("\u0000" + rm.id);
+    let e = byKey.get(key);
+    if(!e){
+      e = {name:(rm.sched||"").trim() || rm.name, n:0, area:0, cuts:false, lot:"",
+           x1:Infinity, y1:Infinity, x2:-Infinity, y2:-Infinity};
+      byKey.set(key, e); groups.push(e);
+    }
+    if(sitePolyActive() && !e.lot){ const lo = roomLot(rm); if(lo) e.lot = lo.name || "Lot"; }
+    e.n++; e.area += g.area/1e6; e.cuts = e.cuts || g.hasCuts;
+    e.x1 = Math.min(e.x1, rm.x); e.y1 = Math.min(e.y1, rm.y);
+    e.x2 = Math.max(e.x2, rm.x + rm.w); e.y2 = Math.max(e.y2, rm.y + rm.h);
+  }
+  const multiLot = lotsActive() && lotsRaw().length > 1;
+  if(groups.length){
+    secs.push({title:"Rooms", head: multiLot ? ["Room","Lot","Sides","Area"] : ["Room","Sides","Area"],
+      rows: groups.map(e => {
+        const sides = ((e.x2-e.x1)/1000).toFixed(1) + " × " + ((e.y2-e.y1)/1000).toFixed(1) + " m" + ((e.cuts || e.n > 1) ? " *" : "");
+        const area = e.area.toFixed(1) + " m²";
+        return multiLot ? [e.name, e.lot || "–", sides, area] : [e.name, sides, area];
+      })});
+  }
+  if(multiLot){
+    const hs = schedHouseOn();
+    secs.push({title:"Lots", head: hs ? ["Lot","Area","Site cover"] : ["Lot","Area"],
+      rows: lotList().map(lot => {
+        const la = lotAreaM2(lot);
+        const fp = roomsInLot(lot.id).reduce((a, rm) => a + (roomCountsAsCover(rm) ? roomGeom(rm).area/1e6 : 0), 0);
+        const row = [lot.name || "Lot", la.toFixed(1) + " m²"];
+        if(hs) row.push(la > 0 ? (100*fp/la).toFixed(1) + "%" : "–");
+        return row;
+      })});
+  }
+  if(sitePolyActive()){
+    const br = schedBlockRuns();
+    if(br.length) secs.push({title:"Block boundary", head:["Edge","Bearing","Length"],
+      rows: br.map(r => [r.name, fmtDeg(bearingDeg(r.a, r.b)), (r.arc/1000).toFixed(3) + " m" + (r.R ? " (R " + (r.R/1000).toFixed(2) + ")" : "")])});
+    const chains = lotsActive() ? splitChains() : [];
+    const sl = [];
+    for(const ch of chains) for(const L of chainLegs(ch))
+      sl.push([L.name, fmtDeg(L.brg), (L.len/1000).toFixed(3) + " m" + (L.R ? " (R " + (L.R/1000).toFixed(2) + ")" : "")]);
+    if(sl.length) secs.push({title:"Split lines", head:["Line","Bearing","Length"], rows:sl});
+  }
+  /* totals, worked the same way as the printed schedule */
+  const sums = {int:0, hall:0, cov:0, out:0, gar:0, park:0};
+  let foot = 0;
+  for(const rm of state.rooms){
+    const a = roomGeom(rm).area/1e6;
+    if(sums[rm.cat] !== undefined) sums[rm.cat] += a;
+    if(rm.cat !== "park") foot += a;
+  }
+  const lotArea = sitePolyActive() ? sitePolyAreaM2() : null;
+  const plotArea = lotArea !== null ? lotArea : state.plot.w*state.plot.d/1e6;
+  const tot = [
+    ["Interior (incl. hall)", (sums.int + sums.hall).toFixed(1) + " m²"],
+    ["Covered", sums.cov.toFixed(1) + " m²"],
+    ["Outdoor / alfresco", sums.out.toFixed(1) + " m²"],
+    ["Carport / garage", sums.gar.toFixed(1) + " m²"]
+  ];
+  if(sums.park > 0) tot.push(["Parking spot (not cover)", sums.park.toFixed(1) + " m²"]);
+  tot.push(["Total footprint", foot.toFixed(1) + " m²"]);
+  tot.push(["Site coverage", (plotArea > 0 ? (100*foot/plotArea).toFixed(1) : "0.0") + "% of " + plotArea.toFixed(1) + " m²"]);
+  if(schedHouseOn()) secs.push({title:"Totals", head:["Item","Value"], rows:tot});
+  return secs;
+}
+async function copyScheduleTable(){
+  const secs = scheduleTableSections();
+  const h = t => String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const cell = 'style="border:1px solid #999;padding:3px 8px;font-family:Arial,sans-serif;font-size:10pt"';
+  const ttl = (($("projectName") && $("projectName").value) || "").trim();
+  const head = (ttl ? ttl + ": " : "") + schedTitle();
+  let html = `<p style="font-family:Arial,sans-serif;font-size:12pt"><b>${h(head)}</b></p>`;
+  let txt = head + "\n\n";
+  for(const sec of secs){
+    html += `<p style="font-family:Arial,sans-serif;font-size:11pt;margin:10px 0 4px"><b>${h(sec.title)}</b></p>`;
+    html += `<table style="border-collapse:collapse">`;
+    html += "<tr>" + sec.head.map((c, i) => `<th ${cell} align="${i ? "right" : "left"}" bgcolor="#eeeeee">${h(c)}</th>`).join("") + "</tr>";
+    for(const r of sec.rows) html += "<tr>" + r.map((c, i) => `<td ${cell} align="${i ? "right" : "left"}">${h(c)}</td>`).join("") + "</tr>";
+    html += "</table>";
+    txt += sec.title + "\n" + sec.head.join("\t") + "\n" + sec.rows.map(r => r.join("\t")).join("\n") + "\n\n";
+  }
+  try{
+    if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], {type:"text/html"}),
+        "text/plain": new Blob([txt], {type:"text/plain"})
+      })]);
+    } else {
+      await navigator.clipboard.writeText(txt);
+    }
+    flashHint("Schedule copied as a table: paste it into Word, Google Docs or Excel");
+  } catch(err){
+    /* clipboard blocked: fall back to a hidden textarea copy of the plain text */
+    const ta = document.createElement("textarea");
+    ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try{ ok = document.execCommand("copy"); }catch(e){}
+    ta.remove();
+    flashHint(ok ? "Schedule copied as tab-separated text" : "Could not reach the clipboard in this browser");
+  }
+}
+/* the boundary runs as the schedule lists them: every run, or with
+   "Compact sched" on, consecutive straight runs of one edge (E2.1, E2.2 …)
+   sharing a bearing merged into one line carrying their total length */
+function schedBlockRuns(){
+  const runs = allBlockRuns();
+  if(!state.schedCompact) return runs;
+  const out = [];
+  for(const r of runs){
+    const m = /^(.+)\.\d+$/.exec(r.name);
+    const base = m ? m[1] : null;
+    const brg = fmtDeg(bearingDeg(r.a, r.b));
+    const prev = out[out.length - 1];
+    if(base && !r.R && prev && prev._base === base && !prev.R && prev._brg === brg){
+      prev.arc += r.arc; prev.b = r.b; prev._n++;
+      prev.name = base + " (" + prev._first + "–" + r.name + ")";
+      continue;
+    }
+    out.push({name:r.name, a:r.a, b:r.b, arc:r.arc, R:r.R, _base:base, _brg:brg, _n:1, _first:r.name});
+  }
   return out;
 }
 
